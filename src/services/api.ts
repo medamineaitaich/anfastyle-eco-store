@@ -72,3 +72,21 @@ export async function fetchStoreProduct(id: number | string) {
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<{ source: string; product: any; variations: any[] }>;
 }
+
+export async function fetchStoreProducts(params: {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  category?: string | number;
+} = {}) {
+  const qs = new URLSearchParams();
+  qs.set("t", String(Date.now()));
+  if (params.page) qs.set("page", String(params.page));
+  if (params.per_page) qs.set("per_page", String(params.per_page));
+  if (params.search) qs.set("search", params.search);
+  if (params.category !== undefined) qs.set("category", String(params.category));
+
+  const res = await fetch(`/api/store/products?${qs.toString()}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<{ source: string; page: number; per_page: number; items: any[] }>;
+}

@@ -154,7 +154,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/" element={<Home setActivePage={handleSetActivePage} onSelectProduct={handleSelectProduct} products={products} />} />
-        <Route path="/catalog" element={<Catalog onSelectProduct={handleSelectProduct} products={products} />} />
+        <Route path="/catalog" element={<Catalog onSelectProduct={handleSelectProduct} />} />
         <Route
           path="/product/:id"
           element={

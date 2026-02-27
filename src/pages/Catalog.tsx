@@ -1,62 +1,60 @@
 import React, { useEffect, useState } from 'react';
 import { ProductCard } from '../components/ui/ProductCard';
 import { Product } from '../types';
-import { fetchProducts } from '../services/api';
+import { fetchStoreProducts } from '../services/api';
 
 interface CatalogProps {
   onSelectProduct: (product: Product) => void;
-  products?: Product[];
 }
 
-export const Catalog = ({ onSelectProduct, products }: CatalogProps) => {
+export const Catalog = ({ onSelectProduct }: CatalogProps) => {
   const [activeCategory, setActiveCategory] = useState('All');
-  const [catalogProducts, setCatalogProducts] = useState<Product[]>(products ?? []);
-  const [isLoading, setIsLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     const loadProducts = async () => {
-      setIsLoading(true);
+      setLoading(true);
       setError(null);
 
       try {
-        const data = await fetchProducts({ per_page: 12, page: 1 });
-        const items = Array.isArray(data) ? data : data?.products;
+        const data = await fetchStoreProducts({
+          page,
+          per_page: 12,
+          search: search || undefined,
+        });
 
-        if (Array.isArray(items)) {
-          const mapped: Product[] = items.map((p: any) => ({
-            id: String(p.id),
-            name: String(p.name ?? ''),
-            price: Number(p.price ?? 0),
-            image: String(p.image ?? p.images?.[0]?.src ?? 'https://picsum.photos/seed/placeholder/600/800'),
-            category: String(p.category ?? p.categories?.[0]?.name ?? 'Uncategorized'),
-            description: String(p.description ?? p.short_description ?? ''),
-            colors: p.colors,
-            sizes: p.sizes,
-          }));
+        const mapped: Product[] = (data.items || []).map((p: any) => ({
+          id: String(p.id),
+          name: String(p.name ?? p.title ?? ''),
+          price: Number((p.on_sale ? p.sale_price : (p.price ?? p.regular_price)) ?? 0),
+          image: String(p.image?.src ?? p.images?.[0]?.src ?? 'https://picsum.photos/seed/placeholder/600/800'),
+          category: String(p.categories?.[0]?.name ?? 'Uncategorized'),
+          description: '',
+        }));
 
-          setCatalogProducts(mapped);
-        } else {
-          setCatalogProducts([]);
-        }
+        setProducts(mapped);
       } catch (err) {
         console.error('Failed to fetch catalog products:', err);
         setError('Failed to load products.');
-        setCatalogProducts([]);
+        setProducts([]);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
     loadProducts();
-  }, []);
+  }, [page, search]);
   
   // Extract unique categories from products, plus 'All'
-  const categories = ['All', ...Array.from(new Set(catalogProducts.map(p => p.category)))];
+  const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
 
   const filteredProducts = activeCategory === 'All' 
-    ? catalogProducts 
-    : catalogProducts.filter(p => p.category === activeCategory);
+    ? products 
+    : products.filter(p => p.category === activeCategory);
 
   return (
     <div className="py-20 bg-cream min-h-screen">
@@ -90,7 +88,7 @@ export const Catalog = ({ onSelectProduct, products }: CatalogProps) => {
         </div>
 
         {/* Product Grid */}
-        {isLoading ? (
+        {loading ? (
           <div className="text-center py-20">
             <p className="text-primary/60">Loading products...</p>
           </div>
@@ -102,7 +100,7 @@ export const Catalog = ({ onSelectProduct, products }: CatalogProps) => {
           </div>
         )}
 
-        {!isLoading && filteredProducts.length === 0 && (
+        {!loading && filteredProducts.length === 0 && (
           <div className="text-center py-20">
             <p className="text-primary/40 italic">No products found in this category.</p>
           </div>
