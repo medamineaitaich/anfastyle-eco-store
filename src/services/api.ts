@@ -66,3 +66,9 @@ export async function fetchCategories() {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function fetchStoreProduct(id: number | string) {
+  const res = await fetch(`/api/store/products/${id}?t=${Date.now()}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<{ source: string; product: any; variations: any[] }>;
+}
