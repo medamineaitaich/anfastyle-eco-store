@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { Home } from './pages/Home';
 import { Catalog } from './pages/Catalog';
@@ -20,20 +21,76 @@ import { useAuth } from './hooks/useAuth';
 import { Product } from './types';
 import { PRODUCTS as MOCK_PRODUCTS } from './data/products';
 
+function getPathForPage(page: string, selectedProduct?: Product | null): string {
+  switch (page) {
+    case 'home':
+      return '/';
+    case 'catalog':
+      return '/catalog';
+    case 'product-detail':
+      return selectedProduct ? `/product/${selectedProduct.id}` : '/catalog';
+    case 'checkout':
+      return '/checkout';
+    case 'thank-you':
+      return '/thank-you';
+    case 'about':
+      return '/about';
+    case 'contact':
+      return '/contact';
+    case 'account':
+      return '/account';
+    case 'search-results':
+      return '/search-results';
+    case 'faqs':
+      return '/faqs';
+    case 'privacy':
+      return '/privacy';
+    case 'terms':
+      return '/terms';
+    case 'disclaimer':
+      return '/disclaimer';
+    default:
+      return '/';
+  }
+}
+
+function getActivePageFromPath(pathname: string): string {
+  if (pathname === '/') return 'home';
+  if (pathname.startsWith('/catalog')) return 'catalog';
+  if (pathname.startsWith('/product/')) return 'product-detail';
+  if (pathname.startsWith('/checkout')) return 'checkout';
+  if (pathname.startsWith('/thank-you')) return 'thank-you';
+  if (pathname.startsWith('/about')) return 'about';
+  if (pathname.startsWith('/contact')) return 'contact';
+  if (pathname.startsWith('/account')) return 'account';
+  if (pathname.startsWith('/search-results')) return 'search-results';
+  if (pathname.startsWith('/faqs')) return 'faqs';
+  if (pathname.startsWith('/privacy')) return 'privacy';
+  if (pathname.startsWith('/terms')) return 'terms';
+  if (pathname.startsWith('/disclaimer')) return 'disclaimer';
+  return 'home';
+}
+
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activePage, setActivePage] = useState('home');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [hasSeenPopup, setHasSeenPopup] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  
+
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
   const { cart, isCartOpen, setIsCartOpen, addToCart, updateQuantity, removeFromCart, clearCart, cartCount } = useCart();
   const { wishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const { user, setUser, orders, addOrder } = useAuth();
+
+  useEffect(() => {
+    setActivePage(getActivePageFromPath(location.pathname));
+  }, [location.pathname]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -50,7 +107,7 @@ export default function App() {
           setProducts(MOCK_PRODUCTS);
         }
       } catch (error) {
-        console.error("Failed to fetch products:", error);
+        console.error('Failed to fetch products:', error);
         setProducts(MOCK_PRODUCTS);
       } finally {
         setIsLoadingProducts(false);
@@ -60,9 +117,18 @@ export default function App() {
     fetchProducts();
   }, []);
 
+  const handleSetActivePage = (page: string) => {
+    setActivePage(page);
+    const targetPath = getPathForPage(page, selectedProduct);
+    if (location.pathname !== targetPath) {
+      navigate(targetPath);
+    }
+  };
+
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
     setActivePage('product-detail');
+    navigate(`/product/${product.id}`);
   };
 
   useEffect(() => {
@@ -76,7 +142,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [hasSeenPopup]);
 
-  const renderPage = () => {
+  const renderRoutes = () => {
     if (isLoadingProducts) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-cream">
@@ -85,80 +151,85 @@ export default function App() {
       );
     }
 
-    switch (activePage) {
-      case 'home': 
-        return <Home setActivePage={setActivePage} onSelectProduct={handleSelectProduct} products={products} />;
-      case 'catalog': 
-        return <Catalog onSelectProduct={handleSelectProduct} products={products} />;
-      case 'product-detail': 
-        return selectedProduct ? (
-          <ProductDetail 
-            product={selectedProduct} 
-            onBack={() => setActivePage('catalog')} 
-            onAddToCart={addToCart} 
-            onAddToWishlist={addToWishlist} 
-          />
-        ) : <Home setActivePage={setActivePage} onSelectProduct={handleSelectProduct} products={products} />;
-      case 'checkout': 
-        return <Checkout 
-          cart={cart} 
-          user={user} 
-          onComplete={(order) => {
-            addOrder(order);
-            clearCart();
-            setActivePage('thank-you');
-          }} 
-        />;
-      case 'thank-you': 
-        return <ThankYou setActivePage={setActivePage} />;
-      case 'about': 
-        return <About />;
-      case 'contact': 
-        return <Contact />;
-      case 'account': 
-        return user 
-          ? <UserProfile 
-              user={user} 
-              setUser={setUser} 
-              orders={orders} 
-              wishlist={wishlist} 
-              removeFromWishlist={removeFromWishlist}
-              setActivePage={setActivePage}
-            /> 
-          : <Register onLogin={(u: any) => {
-              setUser(u);
-              setActivePage('account');
-            }} />;
-      case 'search-results': 
-        return <SearchResults results={searchResults} onSelectProduct={handleSelectProduct} />;
-      case 'faqs': 
-        return <FAQs />;
-      case 'privacy': 
-        return <PrivacyPolicy />;
-      case 'terms': 
-        return <TermsOfService />;
-      case 'disclaimer': 
-        return <Disclaimer />;
-      default: 
-        return <Home setActivePage={setActivePage} onSelectProduct={handleSelectProduct} products={products} />;
-    }
+    return (
+      <Routes>
+        <Route path="/" element={<Home setActivePage={handleSetActivePage} onSelectProduct={handleSelectProduct} products={products} />} />
+        <Route path="/catalog" element={<Catalog onSelectProduct={handleSelectProduct} products={products} />} />
+        <Route
+          path="/product/:id"
+          element={
+            <ProductDetail
+              product={selectedProduct || undefined}
+              onBack={() => handleSetActivePage('catalog')}
+              onAddToCart={addToCart}
+              onAddToWishlist={addToWishlist}
+            />
+          }
+        />
+        <Route
+          path="/checkout"
+          element={
+            <Checkout
+              cart={cart}
+              user={user}
+              onComplete={(order) => {
+                addOrder(order);
+                clearCart();
+                handleSetActivePage('thank-you');
+              }}
+            />
+          }
+        />
+        <Route path="/thank-you" element={<ThankYou setActivePage={handleSetActivePage} />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route
+          path="/account"
+          element={
+            user ? (
+              <UserProfile
+                user={user}
+                setUser={setUser}
+                orders={orders}
+                wishlist={wishlist}
+                removeFromWishlist={removeFromWishlist}
+                setActivePage={handleSetActivePage}
+              />
+            ) : (
+              <Register
+                onLogin={(u: any) => {
+                  setUser(u);
+                  handleSetActivePage('account');
+                }}
+              />
+            )
+          }
+        />
+        <Route path="/search-results" element={<SearchResults results={searchResults} onSelectProduct={handleSelectProduct} />} />
+        <Route path="/faqs" element={<FAQs />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/disclaimer" element={<Disclaimer />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   };
 
   return (
     <Layout
       activePage={activePage}
-      setActivePage={setActivePage}
+      setActivePage={handleSetActivePage}
       onSearchOpen={() => setIsSearchOpen(true)}
-      onAccountOpen={() => setActivePage('account')}
+      onAccountOpen={() => handleSetActivePage('account')}
       onCartOpen={() => setIsCartOpen(true)}
       cartCount={cartCount}
     >
-      {renderPage()}
+      {renderRoutes()}
 
       <SearchOverlay
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        setActivePage={setActivePage}
+        setActivePage={handleSetActivePage}
         setSearchResults={setSearchResults}
         products={products}
       />
@@ -171,14 +242,11 @@ export default function App() {
         onRemove={removeFromCart}
         onCheckout={() => {
           setIsCartOpen(false);
-          setActivePage('checkout');
+          handleSetActivePage('checkout');
         }}
       />
 
-      <Popup
-        isVisible={isPopupVisible}
-        onClose={() => setIsPopupVisible(false)}
-      />
+      <Popup isVisible={isPopupVisible} onClose={() => setIsPopupVisible(false)} />
     </Layout>
   );
 }
