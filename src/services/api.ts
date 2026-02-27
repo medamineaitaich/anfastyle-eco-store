@@ -43,3 +43,26 @@ export const api = {
     });
   }
 };
+
+export async function fetchProducts(params: {
+  page?: number;
+  per_page?: number;
+  search?: string;
+  category?: string | number;
+} = {}) {
+  const qs = new URLSearchParams();
+  if (params.page) qs.set("page", String(params.page));
+  if (params.per_page) qs.set("per_page", String(params.per_page));
+  if (params.search) qs.set("search", params.search);
+  if (params.category !== undefined) qs.set("category", String(params.category));
+
+  const res = await fetch(`/api/products?${qs.toString()}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function fetchCategories() {
+  const res = await fetch(`/api/categories`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
