@@ -1,4 +1,4 @@
-import { wooFetch } from "../../../_lib/woo.js";
+import { wooFetch } from "../../_lib/woo.js";
 
 export default async function handler(req, res) {
   try {
