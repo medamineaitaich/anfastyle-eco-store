@@ -90,3 +90,9 @@ export async function fetchStoreProducts(params: {
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<{ source: string; page: number; per_page: number; items: any[] }>;
 }
+
+export async function fetchStoreCategories() {
+  const res = await fetch(`/api/store/categories?t=${Date.now()}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<{ source: string; items: Array<{ id: number; name: string; slug: string; count: number; parent: number }> }>;
+}
