@@ -55,8 +55,20 @@ export default async function handler(req, res) {
 
     let variations = [];
     if (raw.type === "variable") {
-      const rawVars = await wooFetch(`products/${id}/variations`, { params: { per_page: "100", page: "1" } });
-      variations = rawVars.map(cleanVariation);
+      const allRawVars = [];
+      let page = 1;
+      const per_page = 100;
+
+      while (true) {
+        const pageVars = await wooFetch(`products/${id}/variations`, {
+          params: { per_page: String(per_page), page: String(page) },
+        });
+        if (!Array.isArray(pageVars) || pageVars.length === 0) break;
+        allRawVars.push(...pageVars);
+        page += 1;
+      }
+
+      variations = allRawVars.map(cleanVariation);
     }
 
     // IMPORTANT: marker so we know this endpoint is used
