@@ -56,7 +56,7 @@ export async function fetchProducts(params: {
   if (params.search) qs.set("search", params.search);
   if (params.category !== undefined) qs.set("category", String(params.category));
 
-  const res = await fetch(`/api/products?${qs.toString()}`);
+  const res = await fetch(`/api/store/products?${qs.toString()}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
