@@ -42,6 +42,29 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
         if (!mounted) return;
         setProduct(data.product);
         setVariations(data.variations || []);
+        if (data.variations?.length > 0) {
+          const colors = Array.from(
+            new Set(
+              data.variations
+                .flatMap((v: any) => v?.attributes || [])
+                .filter((attr: any) => String(attr?.slug || '').toLowerCase() === 'colors')
+                .map((attr: any) => String(attr?.option || '').trim())
+                .filter(Boolean)
+            )
+          );
+          const sizes = Array.from(
+            new Set(
+              data.variations
+                .flatMap((v: any) => v?.attributes || [])
+                .filter((attr: any) => String(attr?.slug || '').toLowerCase() === 'sizes')
+                .map((attr: any) => String(attr?.option || '').trim())
+                .filter(Boolean)
+            )
+          );
+
+          if (!selectedColor && colors.length > 0) setSelectedColor(colors[0]);
+          if (!selectedSize && sizes.length > 0) setSelectedSize(sizes[0]);
+        }
       } catch (e: any) {
         if (!mounted) return;
         setError(e?.message || 'Failed to load product.');
