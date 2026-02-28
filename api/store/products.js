@@ -56,10 +56,20 @@ export default async function handler(req, res) {
       per_page = "12",
       search,
       category,
-      orderby = "date",
-      order = "desc",
+      sort = "newest",
+      on_sale,
       status = "publish",
     } = req.query || {};
+
+    let orderby = "date";
+    let order = "desc";
+    if (sort === "price_asc") {
+      orderby = "price";
+      order = "asc";
+    } else if (sort === "price_desc") {
+      orderby = "price";
+      order = "desc";
+    }
 
     const { data, headers } = await wooFetchWithHeaders("products", {
       params: {
@@ -69,6 +79,7 @@ export default async function handler(req, res) {
         category: category ? String(category) : undefined,
         orderby,
         order,
+        on_sale: on_sale !== undefined ? String(on_sale) : undefined,
         status,
       },
     });
