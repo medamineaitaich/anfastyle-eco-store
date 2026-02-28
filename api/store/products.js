@@ -85,6 +85,9 @@ export default async function handler(req, res) {
     });
     const total = Number(headers.get("x-wp-total") || 0);
     const totalPages = Number(headers.get("x-wp-totalpages") || 0);
+    const filtered = Array.isArray(data)
+      ? data.filter((p) => !["grouped", "external"].includes(p.type))
+      : [];
 
     res.status(200).json({
       source: "store-products",
@@ -92,7 +95,7 @@ export default async function handler(req, res) {
       per_page: Number(per_page),
       total,
       totalPages,
-      items: Array.isArray(data) ? data.map(cleanListItem) : [],
+      items: filtered.map(cleanListItem),
     });
   } catch (e) {
     res.status(500).json({ error: e?.message || String(e) });

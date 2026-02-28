@@ -78,6 +78,8 @@ export async function fetchStoreProducts(params: {
   per_page?: number;
   search?: string;
   category?: string | number;
+  sort?: "newest" | "price_asc" | "price_desc";
+  on_sale?: boolean;
 } = {}) {
   const qs = new URLSearchParams();
   qs.set("t", String(Date.now()));
@@ -85,6 +87,8 @@ export async function fetchStoreProducts(params: {
   if (params.per_page) qs.set("per_page", String(params.per_page));
   if (params.search) qs.set("search", params.search);
   if (params.category !== undefined) qs.set("category", String(params.category));
+  if (params.sort) qs.set("sort", params.sort);
+  if (params.on_sale !== undefined) qs.set("on_sale", String(params.on_sale));
 
   const res = await fetch(`/api/store/products?${qs.toString()}`);
   if (!res.ok) throw new Error(await res.text());

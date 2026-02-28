@@ -12,6 +12,8 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
   const [categories, setCategories] = useState<Array<{ id: number; name: string; slug: string; count: number; parent: number }>>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sort, setSort] = useState<'newest' | 'price_asc' | 'price_desc'>('newest');
+  const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -41,6 +43,8 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
           per_page: 12,
           search: searchQuery || undefined,
           category: selectedCategoryId || undefined,
+          sort,
+          on_sale: onSaleOnly ? true : undefined,
         });
         setTotalPages(Number(data.totalPages || 0));
 
@@ -65,7 +69,7 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
     };
 
     loadProducts();
-  }, [page, searchQuery, selectedCategoryId]);
+  }, [page, searchQuery, selectedCategoryId, sort, onSaleOnly]);
 
   return (
     <div className="py-20 bg-cream min-h-screen">
@@ -81,7 +85,7 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
           <p className="text-center text-sm text-red-600 mb-6">{error}</p>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
           <select
             value={selectedCategoryId}
             onChange={(e) => {
@@ -108,6 +112,31 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
             placeholder="Search products..."
             className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3 text-primary"
           />
+
+          <select
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value as 'newest' | 'price_asc' | 'price_desc');
+              setPage(1);
+            }}
+            className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3 text-primary"
+          >
+            <option value="newest">Newest</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+          </select>
+
+          <label className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3 text-primary flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={onSaleOnly}
+              onChange={(e) => {
+                setOnSaleOnly(e.target.checked);
+                setPage(1);
+              }}
+            />
+            <span>On sale</span>
+          </label>
         </div>
 
         {/* Product Grid */}
