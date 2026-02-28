@@ -42,29 +42,6 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
         if (!mounted) return;
         setProduct(data.product);
         setVariations(data.variations || []);
-        if (data.variations?.length > 0) {
-          const colors = Array.from(
-            new Set(
-              data.variations
-                .flatMap((v: any) => v?.attributes || [])
-                .filter((attr: any) => String(attr?.slug || '').toLowerCase() === 'colors')
-                .map((attr: any) => String(attr?.option || '').trim())
-                .filter(Boolean)
-            )
-          );
-          const sizes = Array.from(
-            new Set(
-              data.variations
-                .flatMap((v: any) => v?.attributes || [])
-                .filter((attr: any) => String(attr?.slug || '').toLowerCase() === 'sizes')
-                .map((attr: any) => String(attr?.option || '').trim())
-                .filter(Boolean)
-            )
-          );
-
-          if (!selectedColor && colors.length > 0) setSelectedColor(colors[0]);
-          if (!selectedSize && sizes.length > 0) setSelectedSize(sizes[0]);
-        }
       } catch (e: any) {
         if (!mounted) return;
         setError(e?.message || 'Failed to load product.');
@@ -79,20 +56,119 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
     };
   }, [productIdFromRoute]);
 
+  const normalize = (value: string) => value.trim().toLowerCase();
+  const getVariationAttribute = (variation: any, targetSlug: 'colors' | 'sizes') => {
+    const attr = (variation?.attributes || []).find(
+      (a: any) => String(a?.slug || '').toLowerCase() === targetSlug
+    );
+    return String(attr?.option || '').trim();
+  };
+
+  const isVariableProduct = product?.type === 'variable' && variations.length > 0;
+
+  const availableColors = useMemo(() => {
+    if (!isVariableProduct) return [];
+    return Array.from(
+      new Set(
+        variations
+          .map((v: any) => getVariationAttribute(v, 'colors'))
+          .filter(Boolean)
+      )
+    );
+  }, [isVariableProduct, variations]);
+
+  const availableSizes = useMemo(() => {
+    if (!isVariableProduct) return [];
+    return Array.from(
+      new Set(
+        variations
+          .map((v: any) => getVariationAttribute(v, 'sizes'))
+          .filter(Boolean)
+      )
+    );
+  }, [isVariableProduct, variations]);
+
+  const availableSizesForColor = useMemo(() => {
+    if (!isVariableProduct || !selectedColor) return availableSizes;
+    const targetColor = normalize(selectedColor);
+    return Array.from(
+      new Set(
+        variations
+          .filter((v: any) => normalize(getVariationAttribute(v, 'colors')) === targetColor)
+          .map((v: any) => getVariationAttribute(v, 'sizes'))
+          .filter(Boolean)
+      )
+    );
+  }, [availableSizes, isVariableProduct, selectedColor, variations]);
+
+  const getSelectedVariation = () => {
+    if (!isVariableProduct) return null;
+    if (availableColors.length > 0 && !selectedColor) return null;
+    if (availableSizes.length > 0 && !selectedSize) return null;
+
+    const targetColor = normalize(selectedColor);
+    const targetSize = normalize(selectedSize);
+
+    return (
+      variations.find((v: any) => {
+        const variationColor = normalize(getVariationAttribute(v, 'colors'));
+        const variationSize = normalize(getVariationAttribute(v, 'sizes'));
+        const colorMatches = availableColors.length === 0 || variationColor === targetColor;
+        const sizeMatches = availableSizes.length === 0 || variationSize === targetSize;
+        return colorMatches && sizeMatches;
+      }) || null
+    );
+  };
+
+  useEffect(() => {
+    if (!isVariableProduct) return;
+
+    const firstValid = variations.find((v: any) => {
+      const hasColor = availableColors.length === 0 || Boolean(getVariationAttribute(v, 'colors'));
+      const hasSize = availableSizes.length === 0 || Boolean(getVariationAttribute(v, 'sizes'));
+      return hasColor && hasSize;
+    });
+
+    if (!selectedColor && availableColors.length > 0) {
+      const nextColor = firstValid ? getVariationAttribute(firstValid, 'colors') : availableColors[0];
+      if (nextColor) setSelectedColor(nextColor);
+    }
+
+    const validSizes = selectedColor ? availableSizesForColor : availableSizes;
+    const sizeStillValid = validSizes.some((size) => normalize(size) === normalize(selectedSize));
+
+    if (validSizes.length > 0 && (!selectedSize || !sizeStillValid)) {
+      setSelectedSize(validSizes[0]);
+    }
+  }, [
+    availableColors,
+    availableSizes,
+    availableSizesForColor,
+    isVariableProduct,
+    selectedColor,
+    selectedSize,
+    variations,
+  ]);
+
+  const selectedVariation = getSelectedVariation();
+  const displayPrice = selectedVariation
+    ? (selectedVariation.on_sale
+        ? (selectedVariation.sale_price || selectedVariation.price || selectedVariation.regular_price)
+        : (selectedVariation.price || selectedVariation.regular_price))
+    : (product?.on_sale ? product?.sale_price : (product?.price ?? product?.regular_price));
+  const displayImage = selectedVariation?.image?.src ?? product?.images?.[0]?.src;
+  const addToCartDisabled = isVariableProduct && !selectedVariation;
+
   const cartProduct = useMemo<Product>(() => {
     return {
       id: String(product?.id ?? ''),
       name: product?.name ?? '',
-      price: Number(product?.price ?? product?.regular_price ?? 0),
-      image: product?.images?.[0]?.src ?? '',
+      price: Number(displayPrice ?? product?.price ?? product?.regular_price ?? 0),
+      image: displayImage ?? '',
       category: product?.categories?.[0]?.name ?? '',
       description: String(product?.short_description ?? '')
     };
-  }, [product]);
-
-  const displayPrice = product?.on_sale
-    ? product?.sale_price
-    : (product?.price ?? product?.regular_price);
+  }, [displayImage, displayPrice, product]);
 
   if (loading) {
     return <div className="py-20 bg-cream min-h-screen">Loading...</div>;
@@ -120,7 +196,7 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
           <div className="aspect-[3/4] overflow-hidden rounded-3xl bg-white shadow-xl">
             <img 
-              src={product.images?.[0]?.src} 
+              src={displayImage} 
               alt={product.name} 
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
@@ -139,11 +215,48 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
               dangerouslySetInnerHTML={{ __html: product.short_description || '' }}
             />
 
-            {product.type === 'variable' && variations.length > 0 && (
-              <p className="text-sm font-bold uppercase tracking-widest text-primary/50">Choose options</p>
+            {isVariableProduct && (
+              <div className="space-y-4">
+                <p className="text-sm font-bold uppercase tracking-widest text-primary/50">Choose options</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Color</label>
+                    <select
+                      value={selectedColor}
+                      onChange={(e) => {
+                        setSelectedColor(e.target.value);
+                        setSelectedSize('');
+                      }}
+                      className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3 text-primary"
+                    >
+                      <option value="">Select color</option>
+                      {availableColors.map((color) => (
+                        <option key={color} value={color}>
+                          {color}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Size</label>
+                    <select
+                      value={selectedSize}
+                      onChange={(e) => setSelectedSize(e.target.value)}
+                      className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3 text-primary"
+                    >
+                      <option value="">Select size</option>
+                      {availableSizesForColor.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
             )}
 
-            {product.colors && (
+            {!isVariableProduct && product.colors && (
               <div className="space-y-4">
                 <p className="text-xs font-bold uppercase tracking-widest text-primary/50">Color</p>
                 <div className="flex gap-3">
@@ -161,7 +274,7 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
               </div>
             )}
 
-            {product.sizes && (
+            {!isVariableProduct && product.sizes && (
               <div className="space-y-4">
                 <p className="text-xs font-bold uppercase tracking-widest text-primary/50">Size</p>
                 <div className="flex flex-wrap gap-3">
@@ -186,7 +299,8 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
               <div className="flex gap-4">
                 <button 
                   onClick={() => onAddToCart(cartProduct, selectedColor, selectedSize)}
-                  className="flex-grow bg-primary text-cream py-5 rounded-2xl font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-xl"
+                  disabled={addToCartDisabled}
+                  className="flex-grow bg-primary text-cream py-5 rounded-2xl font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Add to Cart
                 </button>
