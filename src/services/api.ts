@@ -68,9 +68,26 @@ export async function fetchCategories() {
 }
 
 export async function fetchStoreProduct(id: number | string) {
-  const res = await fetch(`/api/store/products/${id}?t=${Date.now()}`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ source: string; product: any; variations: any[] }>;
+  const productRes = await fetch(`/api/store/products/${id}?t=${Date.now()}`);
+  if (!productRes.ok) throw new Error(await productRes.text());
+  const productData = await productRes.json();
+
+  let variations: any[] = [];
+  try {
+    const variationsRes = await fetch(`/api/products/${id}/variations?per_page=100&page=1&t=${Date.now()}`);
+    if (variationsRes.ok) {
+      const rawVariations = await variationsRes.json();
+      variations = Array.isArray(rawVariations) ? rawVariations : [];
+    }
+  } catch {
+    variations = [];
+  }
+
+  return {
+    source: "store-endpoint",
+    product: productData?.product ?? productData,
+    variations,
+  } as { source: string; product: any; variations: any[] };
 }
 
 export async function fetchStoreProducts(params: {
