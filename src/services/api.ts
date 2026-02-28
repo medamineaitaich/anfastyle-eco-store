@@ -88,7 +88,7 @@ export async function fetchStoreProducts(params: {
 
   const res = await fetch(`/api/store/products?${qs.toString()}`);
   if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ source: string; page: number; per_page: number; items: any[] }>;
+  return res.json() as Promise<{ source: string; page: number; per_page: number; total: number; totalPages: number; items: any[] }>;
 }
 
 export async function fetchStoreCategories() {

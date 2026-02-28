@@ -1,5 +1,3 @@
-import { wooFetch } from "../_lib/woo.js";
-
 function cleanListItem(p) {
   return {
     id: p.id,
@@ -18,6 +16,37 @@ function cleanListItem(p) {
   };
 }
 
+async function wooFetchWithHeaders(path, { method = "GET", params = {}, body } = {}) {
+  const base = (process.env.WC_URL || "").replace(/\/$/, "");
+  if (!base) throw new Error("Missing WC_URL env var");
+  if (!process.env.WC_KEY) throw new Error("Missing WC_KEY env var");
+  if (!process.env.WC_SECRET) throw new Error("Missing WC_SECRET env var");
+
+  const url = new URL(`${base}/wp-json/wc/v3/${path}`);
+  url.searchParams.set("consumer_key", process.env.WC_KEY);
+  url.searchParams.set("consumer_secret", process.env.WC_SECRET);
+
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+  }
+
+  const res = await fetch(url.toString(), {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = text; }
+
+  if (!res.ok) {
+    throw new Error(`Woo API error ${res.status}: ${typeof data === "string" ? data : JSON.stringify(data)}`);
+  }
+
+  return { data, headers: res.headers };
+}
+
 export default async function handler(req, res) {
   try {
     res.setHeader("Cache-Control", "no-store");
@@ -32,7 +61,7 @@ export default async function handler(req, res) {
       status = "publish",
     } = req.query || {};
 
-    const data = await wooFetch("products", {
+    const { data, headers } = await wooFetchWithHeaders("products", {
       params: {
         page,
         per_page,
@@ -43,11 +72,15 @@ export default async function handler(req, res) {
         status,
       },
     });
+    const total = Number(headers.get("x-wp-total") || 0);
+    const totalPages = Number(headers.get("x-wp-totalpages") || 0);
 
     res.status(200).json({
       source: "store-products",
       page: Number(page),
       per_page: Number(per_page),
+      total,
+      totalPages,
       items: Array.isArray(data) ? data.map(cleanListItem) : [],
     });
   } catch (e) {

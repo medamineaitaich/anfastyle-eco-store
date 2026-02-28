@@ -1,19 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { ProductCard } from '../components/ui/ProductCard';
 import { Product } from '../types';
-import { fetchStoreProducts } from '../services/api';
+import { fetchStoreCategories, fetchStoreProducts } from '../services/api';
 
 interface CatalogProps {
   onSelectProduct: (product: Product) => void;
 }
 
 export const Catalog = ({ onSelectProduct }: CatalogProps) => {
-  const [activeCategory, setActiveCategory] = useState('All');
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Array<{ id: number; name: string; slug: string; count: number; parent: number }>>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const [totalPages, setTotalPages] = useState(0);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await fetchStoreCategories();
+        setCategories(data.items || []);
+      } catch (err) {
+        console.error('Failed to fetch categories:', err);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -24,8 +39,10 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
         const data = await fetchStoreProducts({
           page,
           per_page: 12,
-          search: search || undefined,
+          search: searchQuery || undefined,
+          category: selectedCategoryId || undefined,
         });
+        setTotalPages(Number(data.totalPages || 0));
 
         const mapped: Product[] = (data.items || []).map((p: any) => ({
           id: String(p.id),
@@ -41,20 +58,14 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
         console.error('Failed to fetch catalog products:', err);
         setError('Failed to load products.');
         setProducts([]);
+        setTotalPages(0);
       } finally {
         setLoading(false);
       }
     };
 
     loadProducts();
-  }, [page, search]);
-  
-  // Extract unique categories from products, plus 'All'
-  const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
-
-  const filteredProducts = activeCategory === 'All' 
-    ? products 
-    : products.filter(p => p.category === activeCategory);
+  }, [page, searchQuery, selectedCategoryId]);
 
   return (
     <div className="py-20 bg-cream min-h-screen">
@@ -70,21 +81,33 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
           <p className="text-center text-sm text-red-600 mb-6">{error}</p>
         )}
 
-        {/* Categories */}
-        <div className="flex flex-wrap justify-center gap-4 mb-16">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-8 py-3 rounded-full text-sm font-bold uppercase tracking-widest transition-all ${
-                activeCategory === cat 
-                  ? 'bg-primary text-cream shadow-lg' 
-                  : 'bg-white text-primary/60 hover:bg-primary/5'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+          <select
+            value={selectedCategoryId}
+            onChange={(e) => {
+              setSelectedCategoryId(e.target.value);
+              setPage(1);
+            }}
+            className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3 text-primary"
+          >
+            <option value="">All categories</option>
+            {categories.map((category) => (
+              <option key={category.id} value={String(category.id)}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search products..."
+            className="w-full bg-white border border-primary/10 rounded-xl px-4 py-3 text-primary"
+          />
         </div>
 
         {/* Product Grid */}
@@ -94,15 +117,35 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12">
-            {filteredProducts.map((product) => (
+            {products.map((product) => (
               <ProductCard key={product.id} product={product} onSelect={onSelectProduct} />
             ))}
           </div>
         )}
 
-        {!loading && filteredProducts.length === 0 && (
+        {!loading && products.length === 0 && (
           <div className="text-center py-20">
-            <p className="text-primary/40 italic">No products found in this category.</p>
+            <p className="text-primary/40 italic">No products found.</p>
+          </div>
+        )}
+
+        {!loading && (
+          <div className="flex items-center justify-center gap-4 mt-12">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-6 py-3 rounded-xl bg-white border border-primary/10 text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-primary/60">Page {page}</span>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={totalPages !== 0 && page >= totalPages}
+              className="px-6 py-3 rounded-xl bg-white border border-primary/10 text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
         )}
       </div>
