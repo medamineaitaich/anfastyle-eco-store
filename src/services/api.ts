@@ -1,5 +1,15 @@
 import { User, Order } from '../types';
 
+async function fetchJson(url: string) {
+  const res = await fetch(url);
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Non-JSON response from ${url}: ${text.slice(0, 120)}`);
+  }
+}
+
 // Mock API service
 export const api = {
   login: async (credentials: any): Promise<User> => {
@@ -68,9 +78,7 @@ export async function fetchCategories() {
 }
 
 export async function fetchStoreProduct(id: number | string) {
-  const res = await fetch(`/api/store/products/${id}?t=${Date.now()}`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ source: string; product: any; variations: any[] }>;
+  return fetchJson(`/api/store/products/${id}?t=${Date.now()}`) as Promise<{ source: string; product: any; variations: any[] }>;
 }
 
 export async function fetchStoreProducts(params: {
@@ -90,9 +98,7 @@ export async function fetchStoreProducts(params: {
   if (params.sort) qs.set("sort", params.sort);
   if (params.on_sale !== undefined) qs.set("on_sale", String(params.on_sale));
 
-  const res = await fetch(`/api/store/products?${qs.toString()}`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ source: string; page: number; per_page: number; total: number; totalPages: number; items: any[] }>;
+  return fetchJson(`/api/store/products?${qs.toString()}`) as Promise<{ source: string; page: number; per_page: number; total: number; totalPages: number; items: any[] }>;
 }
 
 export async function fetchStoreCategories() {
