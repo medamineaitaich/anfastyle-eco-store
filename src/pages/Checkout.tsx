@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { CartItem, User, Order } from '../types';
+import { apiUrl } from '../services/api';
 
 interface CheckoutProps {
   cart: CartItem[];
@@ -47,7 +48,7 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
     setError('');
 
     try {
-      const res = await fetch('/api/store/checkout', {
+      const res = await fetch(apiUrl('/api/store/checkout'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

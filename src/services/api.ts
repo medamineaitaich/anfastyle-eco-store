@@ -1,5 +1,8 @@
 import { User, Order } from '../types';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+export const apiUrl = (path: string) => `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+
 async function fetchJson(url: string) {
   const res = await fetch(url);
   const text = await res.text();
@@ -66,25 +69,25 @@ export async function fetchProducts(params: {
   if (params.search) qs.set("search", params.search);
   if (params.category !== undefined) qs.set("category", String(params.category));
 
-  const res = await fetch(`/api/store/products?${qs.toString()}`);
+  const res = await fetch(apiUrl(`/api/store/products?${qs.toString()}`));
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function fetchCategories() {
-  const res = await fetch(`/api/categories`);
+  const res = await fetch(apiUrl(`/api/categories`));
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
 export async function fetchStoreProduct(id: number | string) {
-  const productRes = await fetch(`/api/store/products/${id}?t=${Date.now()}`);
+  const productRes = await fetch(apiUrl(`/api/store/products/${id}?t=${Date.now()}`));
   if (!productRes.ok) throw new Error(await productRes.text());
   const productData = await productRes.json();
 
   let variations: any[] = [];
   try {
-    const variationsRes = await fetch(`/api/products/${id}/variations?per_page=100&page=1&t=${Date.now()}`);
+    const variationsRes = await fetch(apiUrl(`/api/products/${id}/variations?per_page=100&page=1&t=${Date.now()}`));
     if (variationsRes.ok) {
       const rawVariations = await variationsRes.json();
       variations = Array.isArray(rawVariations) ? rawVariations : [];
@@ -117,11 +120,11 @@ export async function fetchStoreProducts(params: {
   if (params.sort) qs.set("sort", params.sort);
   if (params.on_sale !== undefined) qs.set("on_sale", String(params.on_sale));
 
-  return fetchJson(`/api/store/products?${qs.toString()}`) as Promise<{ source: string; page: number; per_page: number; total: number; totalPages: number; items: any[] }>;
+  return fetchJson(apiUrl(`/api/store/products?${qs.toString()}`)) as Promise<{ source: string; page: number; per_page: number; total: number; totalPages: number; items: any[] }>;
 }
 
 export async function fetchStoreCategories() {
-  const res = await fetch(`/api/store/categories?t=${Date.now()}`);
+  const res = await fetch(apiUrl(`/api/store/categories?t=${Date.now()}`));
   if (!res.ok) throw new Error(await res.text());
   return res.json() as Promise<{ source: string; items: Array<{ id: number; name: string; slug: string; count: number; parent: number }> }>;
 }
