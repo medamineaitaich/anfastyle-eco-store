@@ -21,12 +21,6 @@ function getBaseUrl() {
   return base;
 }
 
-function parseWpError(status, data, fallback) {
-  const msg = typeof data === "object" && data?.message ? String(data.message) : fallback;
-  if (status === 403 || status === 401) return "Invalid email/username or password.";
-  return msg || "Unable to sign in right now. Please try again.";
-}
-
 async function getWpIndex(base) {
   const res = await fetch(`${base}/wp-json`);
   const text = await res.text();
@@ -107,16 +101,29 @@ export default async function handler(req, res) {
       data = { message: text };
     }
 
+    const upstreamMessage = String(data?.message || "").slice(0, 200);
+    const routeError = upstreamMessage.includes("No route was found matching the URL and request method.");
+
+    if (routeError) {
+      console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${url} error="${upstreamMessage}"`);
+      return res.status(500).json({ error: noRoutePluginError(url) });
+    }
+
     if (!wpRes.ok) {
-      const routeError = String(data?.message || "").includes("No route was found matching the URL and request method.");
-      if (routeError) {
-        return res.status(500).json({ error: noRoutePluginError(url) });
-      }
-      return res.status(401).json({ error: parseWpError(wpRes.status, data, "Login failed.") });
+      console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${url} error="${upstreamMessage || "invalid credentials"}"`);
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
     const token = data?.token || data?.jwt;
+    if (!token) {
+      console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${url} error="missing token in successful auth response"`);
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
     const me = await fetchMe(base, token);
+    if (!me) {
+      console.warn(`[auth/login] upstream=200 endpoint=${url} warning="token valid but /users/me unavailable"`);
+    }
 
     return res.status(200).json({
       source: "store-auth-login",

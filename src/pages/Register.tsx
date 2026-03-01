@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { apiUrl } from '../services/api';
 
 interface RegisterProps {
   onLogin: (user: any) => void;
@@ -9,29 +10,69 @@ export const Register = ({ onLogin }: RegisterProps) => {
   const [isSignIn, setIsSignIn] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [password2, setPassword2] = useState('');
+  const [phone, setPhone] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage({ type: '', text: '' });
 
-    // Mock authentication
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
       if (isSignIn) {
-        // Mock Sign In Success
+        const res = await fetch(apiUrl('/api/store/auth/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setMessage({ type: 'error', text: data?.error || 'Invalid email or password' });
+          return;
+        }
+
+        if (!data?.token) {
+          setMessage({ type: 'error', text: 'Login failed: missing token in response.' });
+          return;
+        }
+
         onLogin({
-          firstName: 'John',
-          lastName: 'Doe',
-          email: 'john@example.com',
-          address: '123 Nature Way, Eco City, 90210'
+          firstName: data?.user?.first_name || firstName || '',
+          lastName: data?.user?.last_name || lastName || '',
+          email: data?.user?.email || email,
+          address: '',
         });
       } else {
-        // Mock Registration Success
+        const res = await fetch(apiUrl('/api/store/auth/register'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            first_name: firstName,
+            last_name: lastName,
+            email,
+            password,
+            password2,
+            phone,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setMessage({ type: 'error', text: data?.error || 'Registration failed.' });
+          return;
+        }
+
         setMessage({ type: 'success', text: 'Registration successful! You can now sign in.' });
         setIsSignIn(true);
       }
-    }, 1500);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -53,29 +94,77 @@ export const Register = ({ onLogin }: RegisterProps) => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2 text-left">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">First Name</label>
-                  <input required type="text" className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none" />
+                  <input
+                    required
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                  />
                 </div>
                 <div className="space-y-2 text-left">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Last Name</label>
-                  <input required type="text" className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none" />
+                  <input
+                    required
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                  />
                 </div>
               </div>
             )}
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Email Address</label>
-              <input required type="email" className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none" placeholder="email@example.com" />
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                placeholder="email@example.com"
+              />
             </div>
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Password</label>
-              <input required type="password" title="Password must be at least 8 characters" className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none" placeholder="••••••••" />
+              <input
+                required
+                type="password"
+                title="Password must be at least 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                placeholder="********"
+              />
             </div>
             {!isSignIn && (
               <div className="space-y-2 text-left">
                 <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Confirm Password</label>
-                <input required type="password" title="Passwords must match" className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none" placeholder="••••••••" />
+                <input
+                  required
+                  type="password"
+                  title="Passwords must match"
+                  value={password2}
+                  onChange={(e) => setPassword2(e.target.value)}
+                  className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                  placeholder="********"
+                />
               </div>
             )}
-            <button 
+            {!isSignIn && (
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Phone</label>
+                <input
+                  required
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                  placeholder="+1 555 000 0000"
+                />
+              </div>
+            )}
+            <button
               type="submit"
               disabled={isLoading}
               className="w-full bg-primary text-cream py-5 rounded-2xl font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-xl disabled:opacity-50 flex justify-center items-center"
@@ -90,11 +179,11 @@ export const Register = ({ onLogin }: RegisterProps) => {
 
           <p className="mt-8 text-sm text-primary/60">
             {isSignIn ? "Don't have an account?" : "Already have an account?"}{' '}
-            <button 
+            <button
               onClick={() => {
                 setIsSignIn(!isSignIn);
                 setMessage({ type: '', text: '' });
-              }} 
+              }}
               className="text-secondary font-bold hover:underline"
             >
               {isSignIn ? 'Register' : 'Sign In'}
