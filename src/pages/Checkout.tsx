@@ -9,6 +9,7 @@ interface CheckoutProps {
 }
 
 export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
+  const adminUrl = import.meta.env.VITE_WP_ADMIN_URL;
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal > 75 ? 0 : 10;
   const total = subtotal + shipping;
@@ -92,6 +93,17 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
             <p className="text-primary/70">Your WooCommerce order has been created successfully.</p>
             <p className="text-sm text-primary/60">Order ID: <span className="font-bold text-primary">{successOrder.id}</span></p>
             <p className="text-sm text-primary/60">Total: <span className="font-bold text-primary">${successOrder.total}</span></p>
+            {/* Admin helper (not for customers) */}
+            {adminUrl && (
+              <a
+                href={`${adminUrl}/post.php?post=${successOrder.id}&action=edit`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block text-sm text-primary underline"
+              >
+                View in WooCommerce (admin)
+              </a>
+            )}
           </div>
         </div>
       </div>
