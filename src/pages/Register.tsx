@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { apiUrl } from '../services/api';
 
 interface RegisterProps {
@@ -10,12 +10,41 @@ export const Register = ({ onLogin }: RegisterProps) => {
   const [isSignIn, setIsSignIn] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
-  const [phone, setPhone] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setMessage({ type: 'error', text: 'Please enter your email address first.' });
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const res = await fetch(apiUrl('/api/store/auth/forgot-password'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data?.error || 'Unable to send reset email right now.' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: data?.message || 'If this email exists, a password reset link has been sent.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,8 +71,8 @@ export const Register = ({ onLogin }: RegisterProps) => {
         }
 
         onLogin({
-          firstName: data?.user?.first_name || firstName || '',
-          lastName: data?.user?.last_name || lastName || '',
+          firstName: data?.user?.first_name || '',
+          lastName: data?.user?.last_name || '',
           email: data?.user?.email || email,
           address: '',
         });
@@ -52,12 +81,9 @@ export const Register = ({ onLogin }: RegisterProps) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
             email,
             password,
             password2,
-            phone,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -80,7 +106,7 @@ export const Register = ({ onLogin }: RegisterProps) => {
       <div className="max-w-md w-full mx-auto px-4">
         <div className="bg-white p-10 rounded-3xl shadow-sm text-center">
           <h1 className="text-4xl font-serif mb-2">{isSignIn ? 'Welcome Back' : 'Create Account'}</h1>
-          <p className="text-primary/60 mb-8">{isSignIn ? 'Sign in to your account' : 'Join our eco-conscious community'}</p>
+          <p className="text-primary/60 mb-8">{isSignIn ? 'Sign in to your account' : 'Create your account with email and password'}</p>
 
           {message.text && (
             <div className={`mb-8 p-4 rounded-xl flex items-center gap-3 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
@@ -90,30 +116,6 @@ export const Register = ({ onLogin }: RegisterProps) => {
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {!isSignIn && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 text-left">
-                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">First Name</label>
-                  <input
-                    required
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-2 text-left">
-                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Last Name</label>
-                  <input
-                    required
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                  />
-                </div>
-              </div>
-            )}
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Email Address</label>
               <input
@@ -127,41 +129,60 @@ export const Register = ({ onLogin }: RegisterProps) => {
             </div>
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Password</label>
-              <input
-                required
-                type="password"
-                title="Password must be at least 8 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                placeholder="********"
-              />
-            </div>
-            {!isSignIn && (
-              <div className="space-y-2 text-left">
-                <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Confirm Password</label>
+              <div className="relative">
                 <input
                   required
-                  type="password"
-                  title="Passwords must match"
-                  value={password2}
-                  onChange={(e) => setPassword2(e.target.value)}
-                  className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                  type={showPassword ? 'text' : 'password'}
+                  title="Password must be at least 6 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-6 py-4 pr-14 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
                   placeholder="********"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-4 text-primary/60 hover:text-primary"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+            {isSignIn && (
+              <div className="text-right -mt-2">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isLoading}
+                  className="text-sm text-secondary font-semibold hover:underline disabled:opacity-50"
+                >
+                  Forgot Password?
+                </button>
               </div>
             )}
             {!isSignIn && (
               <div className="space-y-2 text-left">
-                <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Phone</label>
-                <input
-                  required
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                  placeholder="+1 555 000 0000"
-                />
+                <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Confirm Password</label>
+                <div className="relative">
+                  <input
+                    required
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    title="Passwords must match"
+                    value={password2}
+                    onChange={(e) => setPassword2(e.target.value)}
+                    className="w-full px-6 py-4 pr-14 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                    placeholder="********"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    className="absolute inset-y-0 right-4 text-primary/60 hover:text-primary"
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  >
+                    {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
             )}
             <button
@@ -178,7 +199,7 @@ export const Register = ({ onLogin }: RegisterProps) => {
           </form>
 
           <p className="mt-8 text-sm text-primary/60">
-            {isSignIn ? "Don't have an account?" : "Already have an account?"}{' '}
+            {isSignIn ? "Don't have an account?" : 'Already have an account?'}{' '}
             <button
               onClick={() => {
                 setIsSignIn(!isSignIn);
