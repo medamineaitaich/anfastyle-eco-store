@@ -65,7 +65,13 @@ export const CartOverlay = ({ isOpen, onClose, cart, onUpdateQuantity, onRemove,
                         </button>
                       </div>
                       <p className="text-xs text-primary/50 uppercase tracking-widest">
-                        {item.size} / <span className="inline-block w-2 h-2 rounded-full align-middle" style={{ backgroundColor: item.color }} />
+                        {item.variationId
+                          ? `${item.attributes?.color || item.color || '-'} / ${item.attributes?.size || item.size || '-'}`
+                          : (
+                            <>
+                              {item.size} / <span className="inline-block w-2 h-2 rounded-full align-middle" style={{ backgroundColor: item.color }} />
+                            </>
+                          )}
                       </p>
                       <div className="flex justify-between items-center pt-2">
                         <div className="flex items-center border border-primary/10 rounded-lg overflow-hidden">

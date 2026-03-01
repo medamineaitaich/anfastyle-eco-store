@@ -164,15 +164,21 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
   const addToCartDisabled = isVariableProduct && (!selectedColor || !selectedSize || !selectedVariation || isOutOfStock);
 
   const cartProduct = useMemo<Product>(() => {
+    const parentId = String(product?.id ?? '');
+    const variationImage = selectedVariation?.image?.src || selectedVariation?.image?.thumbnail || displayImage || '';
+    const variationPrice = Number(selectedVariation?.price ?? selectedVariation?.regular_price ?? product?.price ?? product?.regular_price ?? 0);
+
     return {
-      id: String(product?.id ?? ''),
+      id: parentId,
       name: product?.name ?? '',
-      price: Number(displayPrice ?? product?.price ?? product?.regular_price ?? 0),
-      image: displayImage ?? '',
+      price: isVariableProduct ? variationPrice : Number(displayPrice ?? product?.price ?? product?.regular_price ?? 0),
+      image: isVariableProduct ? variationImage : (displayImage ?? ''),
+      variationId: isVariableProduct ? selectedVariation?.id : undefined,
+      attributes: isVariableProduct ? { color: selectedColor || undefined, size: selectedSize || undefined } : undefined,
       category: product?.categories?.[0]?.name ?? '',
       description: String(product?.short_description ?? '')
     };
-  }, [displayImage, displayPrice, product]);
+  }, [displayImage, displayPrice, isVariableProduct, product, selectedColor, selectedSize, selectedVariation]);
 
   if (loading) {
     return <div className="py-20 bg-cream min-h-screen">Loading...</div>;
@@ -305,7 +311,10 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
             <div className="pt-8 space-y-4">
               <div className="flex gap-4">
                 <button 
-                  onClick={() => onAddToCart(cartProduct, selectedColor, selectedSize)}
+                  onClick={() => {
+                    if (isVariableProduct && (!selectedVariation || !selectedColor || !selectedSize)) return;
+                    onAddToCart(cartProduct, selectedColor, selectedSize);
+                  }}
                   disabled={addToCartDisabled}
                   className="flex-grow bg-primary text-cream py-5 rounded-2xl font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 >

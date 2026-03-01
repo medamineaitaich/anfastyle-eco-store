@@ -6,8 +6,15 @@ export const useCart = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   const addToCart = (product: Product, color: string, size: string) => {
+    const productColor = product.attributes?.color || color;
+    const productSize = product.attributes?.size || size;
     const existingItemIndex = cart.findIndex(
-      item => item.id === product.id && item.color === color && item.size === size
+      item => {
+        if (product.variationId || item.variationId) {
+          return item.id === product.id && item.variationId === product.variationId;
+        }
+        return item.id === product.id && item.color === productColor && item.size === productSize;
+      }
     );
 
     if (existingItemIndex > -1) {
@@ -15,7 +22,16 @@ export const useCart = () => {
       newCart[existingItemIndex].quantity += 1;
       setCart(newCart);
     } else {
-      setCart([...cart, { ...product, color, size, quantity: 1 }]);
+      setCart([...cart, {
+        ...product,
+        color: productColor,
+        size: productSize,
+        attributes: {
+          color: productColor || product.attributes?.color,
+          size: productSize || product.attributes?.size,
+        },
+        quantity: 1
+      }]);
     }
     setIsCartOpen(true);
   };

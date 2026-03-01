@@ -3,6 +3,8 @@ export interface Product {
   name: string;
   price: number;
   image: string;
+  variationId?: number;
+  attributes?: { color?: string; size?: string };
   category: string;
   description: string;
   colors?: string[];

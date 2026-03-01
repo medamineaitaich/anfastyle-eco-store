@@ -130,7 +130,11 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
                     </div>
                     <div className="flex-grow">
                       <h4 className="text-sm font-medium">{item.name}</h4>
-                      <p className="text-xs text-primary/50">{item.size} / {item.color}</p>
+                      <p className="text-xs text-primary/50">
+                        {item.variationId
+                          ? `${item.attributes?.color || item.color || '-'} / ${item.attributes?.size || item.size || '-'}`
+                          : `${item.size} / ${item.color}`}
+                      </p>
                       <p className="text-xs">Qty: {item.quantity}</p>
                     </div>
                     <p className="text-sm font-bold">${(item.price * item.quantity).toFixed(2)}</p>
