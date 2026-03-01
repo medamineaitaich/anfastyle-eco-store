@@ -27,6 +27,46 @@ function parseWpError(status, data, fallback) {
   return msg || "Unable to sign in right now. Please try again.";
 }
 
+async function getWpIndex(base) {
+  const res = await fetch(`${base}/wp-json`);
+  const text = await res.text();
+  let data = {};
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = {};
+  }
+  return data || {};
+}
+
+function detectAuthEndpoint(indexData, base) {
+  const routes = indexData?.routes || {};
+  const hasJwtTokenRoute = Boolean(routes["/jwt-auth/v1/token"]);
+  const hasSimpleJwtAuthRoute = Boolean(routes["/simple-jwt-login/v1/auth"]);
+
+  if (hasJwtTokenRoute) return `${base}/wp-json/jwt-auth/v1/token`;
+  if (hasSimpleJwtAuthRoute) return `${base}/wp-json/simple-jwt-login/v1/auth`;
+  return `${base}/wp-json/jwt-auth/v1/token`;
+}
+
+async function fetchMe(base, token) {
+  if (!token) return null;
+  const res = await fetch(`${base}/wp-json/wp/v2/users/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function noRoutePluginError(authUrl) {
+  return `WordPress auth endpoint is missing. Install/enable a JWT plugin exposing POST ${authUrl}.`;
+}
+
 export default async function handler(req, res) {
   try {
     res.setHeader("Cache-Control", "no-store");
@@ -50,7 +90,8 @@ export default async function handler(req, res) {
     if (!password) return badRequest(res, "Password is required.");
 
     const base = getBaseUrl();
-    const url = `${base}/wp-json/jwt-auth/v1/token`;
+    const wpIndex = await getWpIndex(base);
+    const url = detectAuthEndpoint(wpIndex, base);
 
     const wpRes = await fetch(url, {
       method: "POST",
@@ -67,18 +108,26 @@ export default async function handler(req, res) {
     }
 
     if (!wpRes.ok) {
+      const routeError = String(data?.message || "").includes("No route was found matching the URL and request method.");
+      if (routeError) {
+        return res.status(500).json({ error: noRoutePluginError(url) });
+      }
       return res.status(401).json({ error: parseWpError(wpRes.status, data, "Login failed.") });
     }
 
+    const token = data?.token || data?.jwt;
+    const me = await fetchMe(base, token);
+
     return res.status(200).json({
       source: "store-auth-login",
-      token: data?.token,
+      token,
       user: {
-        id: data?.user_id,
-        email: data?.user_email,
-        nicename: data?.user_nicename,
-        display_name: data?.user_display_name,
+        id: me?.id ?? data?.user_id,
+        email: me?.email ?? data?.user_email,
+        first_name: me?.first_name ?? "",
+        last_name: me?.last_name ?? "",
       },
+      message: "Login successful.",
     });
   } catch (e) {
     return res.status(500).json({ error: e?.message || "Unable to sign in right now. Please try again." });
