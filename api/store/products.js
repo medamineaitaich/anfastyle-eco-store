@@ -86,7 +86,7 @@ export default async function handler(req, res) {
     const total = Number(headers.get("x-wp-total") || 0);
     const totalPages = Number(headers.get("x-wp-totalpages") || 0);
     const filtered = Array.isArray(data)
-      ? data.filter((p) => !["grouped", "external"].includes(p.type))
+      ? data.filter((p) => ["simple", "variable"].includes(p.type))
       : [];
 
     res.status(200).json({
