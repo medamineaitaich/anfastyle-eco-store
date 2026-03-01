@@ -157,7 +157,8 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
         : (selectedVariation.price || selectedVariation.regular_price))
     : (product?.on_sale ? product?.sale_price : (product?.price ?? product?.regular_price));
   const displayImage = selectedVariation?.image?.src ?? product?.images?.[0]?.src;
-  const addToCartDisabled = isVariableProduct && !selectedVariation;
+  const isOutOfStock = isVariableProduct && selectedVariation?.stock_status !== 'instock';
+  const addToCartDisabled = isVariableProduct && (!selectedColor || !selectedSize || !selectedVariation || isOutOfStock);
 
   const cartProduct = useMemo<Product>(() => {
     return {
@@ -253,6 +254,9 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
                     </select>
                   </div>
                 </div>
+                {selectedColor && selectedSize && isOutOfStock && (
+                  <p className="text-xs text-red-600">Out of stock</p>
+                )}
               </div>
             )}
 
