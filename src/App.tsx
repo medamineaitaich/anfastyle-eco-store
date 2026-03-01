@@ -175,7 +175,6 @@ export default function App() {
               onComplete={(order) => {
                 addOrder(order);
                 clearCart();
-                handleSetActivePage('thank-you');
               }}
             />
           }

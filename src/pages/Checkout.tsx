@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { CartItem, User, Order } from '../types';
 
@@ -14,31 +14,89 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
   const total = subtotal + shipping;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successOrder, setSuccessOrder] = useState<{ id: number | string; total: string | number } | null>(null);
+  const [notes, setNotes] = useState('');
+  const [customer, setCustomer] = useState({
+    first_name: user?.firstName || '',
+    last_name: user?.lastName || '',
+    email: user?.email || '',
+    phone: '',
+    address_1: user?.address || '',
+    city: '',
+    country: 'US',
+    postcode: '',
+  });
 
-  const handleCompleteOrder = () => {
+  const cartItems = useMemo(() => {
+    return cart
+      .map((item) => {
+        const productId = Number(item.id);
+        if (!Number.isFinite(productId) || productId <= 0) return null;
+        return {
+          product_id: productId,
+          quantity: item.quantity,
+          variation_id: item.variationId,
+        };
+      })
+      .filter(Boolean);
+  }, [cart]);
+
+  const handleCompleteOrder = async () => {
     setIsLoading(true);
     setError('');
 
-    // Mock processing
-    setTimeout(() => {
-      setIsLoading(false);
-      // Random failure simulation (10% chance)
-      if (Math.random() < 0.1) {
-        setError('Payment failed. Please check your card details and try again.');
-        return;
+    try {
+      const res = await fetch('/api/store/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer,
+          items: cartItems,
+          notes: notes || undefined,
+        }),
+      });
+
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body?.error || 'Checkout failed. Please try again.');
       }
 
+      const wcOrder = body?.order || {};
+      setSuccessOrder({
+        id: wcOrder.id ?? 'N/A',
+        total: wcOrder.total ?? total.toFixed(2),
+      });
+
       const newOrder: Order = {
-        id: Math.random().toString(36).substr(2, 9).toUpperCase(),
+        id: String(wcOrder.id ?? Math.random().toString(36).slice(2, 10).toUpperCase()),
         date: new Date().toLocaleDateString(),
-        status: 'Processing',
+        status: String(wcOrder.status || 'processing'),
         trackingNumber: 'ANF' + Math.floor(Math.random() * 1000000000),
         items: [...cart],
-        total: total
+        total: Number(wcOrder.total ?? total),
       };
       onComplete(newOrder);
-    }, 2000);
+    } catch (e: any) {
+      setError(e?.message || 'Checkout failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (successOrder) {
+    return (
+      <div className="py-20 bg-cream min-h-screen">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white p-10 rounded-3xl shadow-sm text-center space-y-4">
+            <h1 className="text-4xl font-serif">Order Placed</h1>
+            <p className="text-primary/70">Your WooCommerce order has been created successfully.</p>
+            <p className="text-sm text-primary/60">Order ID: <span className="font-bold text-primary">{successOrder.id}</span></p>
+            <p className="text-sm text-primary/60">Total: <span className="font-bold text-primary">${successOrder.total}</span></p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-20 bg-cream min-h-screen">
@@ -59,31 +117,74 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
               <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => e.preventDefault()}>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">First Name</label>
-                  <input type="text" defaultValue={user?.firstName || ''} className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" />
+                  <input
+                    type="text"
+                    value={customer.first_name}
+                    onChange={(e) => setCustomer((v) => ({ ...v, first_name: e.target.value }))}
+                    className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Last Name</label>
-                  <input type="text" defaultValue={user?.lastName || ''} className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" />
+                  <input
+                    type="text"
+                    value={customer.last_name}
+                    onChange={(e) => setCustomer((v) => ({ ...v, last_name: e.target.value }))}
+                    className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none"
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Email</label>
+                  <input
+                    type="email"
+                    value={customer.email}
+                    onChange={(e) => setCustomer((v) => ({ ...v, email: e.target.value }))}
+                    className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none"
+                  />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Phone</label>
+                  <input
+                    type="tel"
+                    value={customer.phone}
+                    onChange={(e) => setCustomer((v) => ({ ...v, phone: e.target.value }))}
+                    className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none"
+                  />
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Address</label>
-                  <input type="text" defaultValue={user?.address || ''} className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" />
+                  <input
+                    type="text"
+                    value={customer.address_1}
+                    onChange={(e) => setCustomer((v) => ({ ...v, address_1: e.target.value }))}
+                    className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">City</label>
-                  <input type="text" className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">State / Province</label>
-                  <input type="text" className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" />
+                  <input
+                    type="text"
+                    value={customer.city}
+                    onChange={(e) => setCustomer((v) => ({ ...v, city: e.target.value }))}
+                    className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Postal Code</label>
-                  <input type="text" className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" />
+                  <input
+                    type="text"
+                    value={customer.postcode}
+                    onChange={(e) => setCustomer((v) => ({ ...v, postcode: e.target.value }))}
+                    className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Country</label>
-                  <select className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none appearance-none">
+                  <select
+                    value={customer.country}
+                    onChange={(e) => setCustomer((v) => ({ ...v, country: e.target.value }))}
+                    className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none appearance-none"
+                  >
                     <option value="US">United States</option>
                     <option value="CA">Canada</option>
                     <option value="UK">United Kingdom</option>
@@ -91,31 +192,20 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
                   </select>
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Phone Number (Optional)</label>
-                  <input type="tel" className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" placeholder="+1 (555) 000-0000" />
+                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Notes (Optional)</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none"
+                    rows={3}
+                  />
                 </div>
               </form>
             </section>
 
             <section className="bg-white p-8 rounded-3xl shadow-sm">
-              <h2 className="text-xl font-bold mb-6">Payment</h2>
-              <div className="space-y-4">
-                <div className="p-4 border-2 border-primary rounded-xl flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-4 h-4 rounded-full bg-primary" />
-                    <span className="font-medium">Credit Card</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="w-8 h-5 bg-primary/10 rounded" />
-                    <div className="w-8 h-5 bg-primary/10 rounded" />
-                  </div>
-                </div>
-                <input type="text" placeholder="Card Number" className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" />
-                <div className="grid grid-cols-2 gap-4">
-                  <input type="text" placeholder="MM/YY" className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" />
-                  <input type="text" placeholder="CVC" className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none" />
-                </div>
-              </div>
+              <h2 className="text-xl font-bold mb-2">Payment</h2>
+              <p className="text-sm text-primary/60">Cash on delivery</p>
             </section>
           </div>
 
@@ -159,7 +249,7 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
 
               <button 
                 onClick={handleCompleteOrder}
-                disabled={isLoading}
+                disabled={isLoading || cartItems.length === 0}
                 className="w-full bg-primary text-cream py-5 rounded-2xl font-bold uppercase tracking-widest hover:bg-accent transition-all mt-8 shadow-xl disabled:opacity-50 flex justify-center items-center"
               >
                 {isLoading ? (
