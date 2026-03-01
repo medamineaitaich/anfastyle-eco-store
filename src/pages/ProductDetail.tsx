@@ -152,11 +152,14 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
 
   const selectedVariation = getSelectedVariation();
   const displayPrice = selectedVariation
-    ? (selectedVariation.on_sale
-        ? (selectedVariation.sale_price || selectedVariation.price || selectedVariation.regular_price)
-        : (selectedVariation.price || selectedVariation.regular_price))
+    ? (selectedVariation.price ?? selectedVariation.regular_price ?? product?.price ?? product?.regular_price)
     : (product?.on_sale ? product?.sale_price : (product?.price ?? product?.regular_price));
-  const displayImage = selectedVariation?.image?.src ?? product?.images?.[0]?.src;
+  const displayImage =
+    selectedVariation?.image?.src ??
+    selectedVariation?.image?.thumbnail ??
+    product?.images?.[0]?.src ??
+    product?.images?.[0]?.thumbnail ??
+    '';
   const isOutOfStock = isVariableProduct && selectedVariation?.stock_status !== 'instock';
   const addToCartDisabled = isVariableProduct && (!selectedColor || !selectedSize || !selectedVariation || isOutOfStock);
 
