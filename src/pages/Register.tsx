@@ -10,12 +10,9 @@ export const Register = ({ onLogin }: RegisterProps) => {
   const [isSignIn, setIsSignIn] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
-  const [phone, setPhone] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,8 +39,8 @@ export const Register = ({ onLogin }: RegisterProps) => {
         }
 
         onLogin({
-          firstName: data?.user?.first_name || firstName || '',
-          lastName: data?.user?.last_name || lastName || '',
+          firstName: data?.user?.first_name || '',
+          lastName: data?.user?.last_name || '',
           email: data?.user?.email || email,
           address: '',
         });
@@ -52,12 +49,9 @@ export const Register = ({ onLogin }: RegisterProps) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            first_name: firstName,
-            last_name: lastName,
             email,
             password,
             password2,
-            phone,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -80,7 +74,7 @@ export const Register = ({ onLogin }: RegisterProps) => {
       <div className="max-w-md w-full mx-auto px-4">
         <div className="bg-white p-10 rounded-3xl shadow-sm text-center">
           <h1 className="text-4xl font-serif mb-2">{isSignIn ? 'Welcome Back' : 'Create Account'}</h1>
-          <p className="text-primary/60 mb-8">{isSignIn ? 'Sign in to your account' : 'Join our eco-conscious community'}</p>
+          <p className="text-primary/60 mb-8">{isSignIn ? 'Sign in to your account' : 'Create your account with email and password'}</p>
 
           {message.text && (
             <div className={`mb-8 p-4 rounded-xl flex items-center gap-3 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
@@ -90,30 +84,6 @@ export const Register = ({ onLogin }: RegisterProps) => {
           )}
 
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {!isSignIn && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 text-left">
-                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">First Name</label>
-                  <input
-                    required
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-2 text-left">
-                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Last Name</label>
-                  <input
-                    required
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                  />
-                </div>
-              </div>
-            )}
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Email Address</label>
               <input
@@ -151,19 +121,6 @@ export const Register = ({ onLogin }: RegisterProps) => {
                 />
               </div>
             )}
-            {!isSignIn && (
-              <div className="space-y-2 text-left">
-                <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Phone</label>
-                <input
-                  required
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                  placeholder="+1 555 000 0000"
-                />
-              </div>
-            )}
             <button
               type="submit"
               disabled={isLoading}
@@ -178,7 +135,7 @@ export const Register = ({ onLogin }: RegisterProps) => {
           </form>
 
           <p className="mt-8 text-sm text-primary/60">
-            {isSignIn ? "Don't have an account?" : "Already have an account?"}{' '}
+            {isSignIn ? "Don't have an account?" : 'Already have an account?'}{' '}
             <button
               onClick={() => {
                 setIsSignIn(!isSignIn);

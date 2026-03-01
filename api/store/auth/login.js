@@ -16,7 +16,7 @@ function parseBody(req) {
 }
 
 function getBaseUrl() {
-  const base = (process.env.WC_URL || "").replace(/\/$/, "");
+  const base = (process.env.WC_URL || process.env.WOOCOMMERCE_URL || "").replace(/\/$/, "");
   if (!base) throw new Error("Store auth is not configured on the server.");
   return base;
 }

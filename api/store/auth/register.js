@@ -55,8 +55,6 @@ export default async function handler(req, res) {
     const password2 = String(body.password2 || "");
     const phone = String(body.phone || "").trim();
 
-    if (!first_name) return badRequest(res, "First name is required.");
-    if (!last_name) return badRequest(res, "Last name is required.");
     if (!email) return badRequest(res, "Email is required.");
     if (!EMAIL_RE.test(email)) return badRequest(res, "Please enter a valid email address.");
     if (!password) return badRequest(res, "Password is required.");
@@ -66,17 +64,22 @@ export default async function handler(req, res) {
       return badRequest(res, "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
     }
 
+    const emailLocalPart = email.split("@")[0] || "Customer";
+    const fallbackName = emailLocalPart.charAt(0).toUpperCase() + emailLocalPart.slice(1);
+    const resolvedFirstName = first_name || fallbackName;
+    const resolvedLastName = last_name || "Customer";
+
     const created = await wooFetch("customers", {
       method: "POST",
       body: {
         email,
         username: makeUsername(email),
         password,
-        first_name,
-        last_name,
+        first_name: resolvedFirstName,
+        last_name: resolvedLastName,
         billing: {
-          first_name,
-          last_name,
+          first_name: resolvedFirstName,
+          last_name: resolvedLastName,
           email,
           phone,
         },
