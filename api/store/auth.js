@@ -487,98 +487,46 @@ async function submitNewPassword(base, state, password) {
 
 async function handleLogin(req, res, body) {
   const email = String(body.email || "").trim().toLowerCase();
-  const username = String(body.username || "").trim();
   const password = String(body.password || "");
-  const loginName = username || email;
-
-  if (!loginName) return badRequest(res, "Email or username is required.");
-  if (email && !EMAIL_RE.test(email)) return badRequest(res, "Please enter a valid email address.");
+  if (!email) return badRequest(res, "Email is required.");
+  if (!EMAIL_RE.test(email)) return badRequest(res, "Please enter a valid email address.");
   if (!password) return badRequest(res, "Password is required.");
 
   const base = getBaseUrl();
-  const wpIndex = await getWpIndex(base);
-  const endpoints = detectAuthEndpoints(wpIndex, base);
-  const loginNames = [loginName];
-  if (email && !username) {
-    const usernameFromCustomer = await findCustomerUsernameByEmail(email);
-    if (usernameFromCustomer && usernameFromCustomer !== loginName) {
-      loginNames.push(usernameFromCustomer);
-    }
+  const authUrl = `${base}/?rest_route=/simple-jwt-login/v1/auth`;
+  const wpRes = await fetch(authUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const rawText = await wpRes.text();
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    data = {};
   }
 
-  let final = null;
-  let routeErrorEndpoint = "";
-
-  for (const endpoint of endpoints) {
-    for (const candidate of loginNames) {
-      const result = await requestToken(endpoint, candidate, password);
-      const message = String(result.data?.message || "").slice(0, 200);
-      const routeError = message.includes("No route was found matching the URL and request method.");
-
-      if (routeError) {
-        routeErrorEndpoint = endpoint;
-        final = { ...result, endpoint, loginName: candidate, message };
-        continue;
-      }
-
-      if (result.wpRes.ok) {
-        final = { ...result, endpoint, loginName: candidate, message };
-        break;
-      }
-
-      final = { ...result, endpoint, loginName: candidate, message };
-    }
-    if (final?.wpRes?.ok) break;
+  const wpError = String(data?.error || "").trim();
+  if (wpRes.status !== 200 || data?.success !== true) {
+    return res.status(401).json({
+      error: wpError || "Invalid email or password",
+    });
   }
 
-  const wpRes = final?.wpRes || { ok: false, status: 0 };
-  const data = final?.data || {};
-  const upstreamMessage = String(final?.message || data?.message || "").slice(0, 200);
-
-  if (!wpRes.ok && routeErrorEndpoint && endpoints.length === 1) {
-    console.warn(`[auth/login] jwt route missing at ${routeErrorEndpoint}; trying wp-login fallback`);
-    const fallback = await fallbackLoginWithoutJwt(base, loginNames, email, password);
-    if (fallback?.ok) {
-      return res.status(200).json({
-        source: "store-auth-login-wp-form",
-        token: null,
-        user: fallback.user,
-        message: "Login successful.",
-      });
-    }
-
-    if (fallback?.reason === "invalid_credentials") {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-
-    console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${routeErrorEndpoint} error="${upstreamMessage}"`);
-    return res.status(500).json({ error: noRoutePluginError(routeErrorEndpoint) });
-  }
-
-  if (!wpRes.ok) {
-    console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${final?.endpoint || endpoints[0]} login="${final?.loginName || loginName}" attempt="${final?.method || "unknown"}" error="${upstreamMessage || "invalid credentials"}"`);
-    return res.status(401).json({ error: "Invalid email or password" });
-  }
-
-  const token = data?.token || data?.jwt;
+  const token = String(data?.data?.jwt || "").trim();
   if (!token) {
-    console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${final?.endpoint || endpoints[0]} error="missing token in successful auth response"`);
     return res.status(401).json({ error: "Invalid email or password" });
-  }
-
-  const me = await fetchMe(base, token);
-  if (!me) {
-    console.warn(`[auth/login] upstream=200 endpoint=${final?.endpoint || endpoints[0]} warning="token valid but /users/me unavailable"`);
   }
 
   return res.status(200).json({
     source: "store-auth-login",
     token,
     user: {
-      id: me?.id ?? data?.user_id,
-      email: me?.email ?? data?.user_email,
-      first_name: me?.first_name ?? "",
-      last_name: me?.last_name ?? "",
+      email,
     },
     message: "Login successful.",
   });
