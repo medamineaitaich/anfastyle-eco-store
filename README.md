@@ -25,6 +25,7 @@ View your app in AI Studio: https://ai.studio/apps/860ef45c-582a-4940-8511-f287e
 
 - Customer account creation uses `POST /api/store/auth/register` and creates WooCommerce customers directly in WordPress.
 - Customer sign-in uses `POST /api/store/auth/login` and requires a WordPress JWT auth plugin endpoint.
+- Password reset requests use `POST /api/store/auth/forgot-password`, which triggers WordPress lost-password email delivery.
 - Generate API keys in WooCommerce admin: `WooCommerce -> Settings -> Advanced -> REST API`.
 - Use a full site URL in `WOOCOMMERCE_URL` (for example: `https://your-store.com`).
 - The backend route `GET /api/products` now fetches all published products using WooCommerce pagination and returns them to the React frontend.

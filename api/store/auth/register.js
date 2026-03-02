@@ -1,7 +1,7 @@
 import { wooFetch } from "../../_lib/woo.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const STRONG_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+const PASSWORD_RE = /^.{6,}$/;
 
 function badRequest(res, error) {
   return res.status(400).json({ error });
@@ -60,8 +60,8 @@ export default async function handler(req, res) {
     if (!password) return badRequest(res, "Password is required.");
     if (!password2) return badRequest(res, "Password confirmation is required.");
     if (password !== password2) return badRequest(res, "Passwords do not match.");
-    if (!STRONG_PASSWORD_RE.test(password)) {
-      return badRequest(res, "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.");
+    if (!PASSWORD_RE.test(password)) {
+      return badRequest(res, "Password must be at least 6 characters.");
     }
 
     const emailLocalPart = email.split("@")[0] || "Customer";

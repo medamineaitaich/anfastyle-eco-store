@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { apiUrl } from '../services/api';
 
 interface RegisterProps {
@@ -13,6 +13,38 @@ export const Register = ({ onLogin }: RegisterProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setMessage({ type: 'error', text: 'Please enter your email address first.' });
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const res = await fetch(apiUrl('/api/store/auth/forgot-password'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data?.error || 'Unable to send reset email right now.' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: data?.message || 'If this email exists, a password reset link has been sent.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,28 +129,60 @@ export const Register = ({ onLogin }: RegisterProps) => {
             </div>
             <div className="space-y-2 text-left">
               <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Password</label>
-              <input
-                required
-                type="password"
-                title="Password must be at least 8 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                placeholder="********"
-              />
+              <div className="relative">
+                <input
+                  required
+                  type={showPassword ? 'text' : 'password'}
+                  title="Password must be at least 6 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-6 py-4 pr-14 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                  placeholder="********"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-4 text-primary/60 hover:text-primary"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
+            {isSignIn && (
+              <div className="text-right -mt-2">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isLoading}
+                  className="text-sm text-secondary font-semibold hover:underline disabled:opacity-50"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
             {!isSignIn && (
               <div className="space-y-2 text-left">
                 <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Confirm Password</label>
-                <input
-                  required
-                  type="password"
-                  title="Passwords must match"
-                  value={password2}
-                  onChange={(e) => setPassword2(e.target.value)}
-                  className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                  placeholder="********"
-                />
+                <div className="relative">
+                  <input
+                    required
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    title="Passwords must match"
+                    value={password2}
+                    onChange={(e) => setPassword2(e.target.value)}
+                    className="w-full px-6 py-4 pr-14 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                    placeholder="********"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((v) => !v)}
+                    className="absolute inset-y-0 right-4 text-primary/60 hover:text-primary"
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  >
+                    {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
             )}
             <button
