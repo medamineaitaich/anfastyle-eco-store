@@ -92,6 +92,37 @@ function noRoutePluginError(authUrl) {
   return `WordPress auth endpoint is missing. Install/enable a JWT plugin exposing POST ${authUrl}.`;
 }
 
+async function requestToken(url, loginName, password) {
+  const wpRes = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: loginName, password }),
+  });
+
+  const text = await wpRes.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { message: text };
+  }
+
+  return { wpRes, data };
+}
+
+async function findCustomerUsernameByEmail(email) {
+  if (!email) return "";
+  try {
+    const customers = await wooFetch("customers", { params: { email, per_page: 1 } });
+    if (Array.isArray(customers) && customers.length > 0) {
+      return String(customers[0]?.username || "").trim();
+    }
+  } catch (e) {
+    console.warn(`[auth/login] customer lookup failed for email=${email}: ${e?.message || e}`);
+  }
+  return "";
+}
+
 function extractLostPasswordNonce(html) {
   const match = String(html || "").match(/name=["']woocommerce-lost-password-nonce["']\s+value=["']([^"']+)["']/i);
   return match?.[1] || "";
@@ -253,18 +284,13 @@ async function handleLogin(req, res, body) {
   const wpIndex = await getWpIndex(base);
   const url = detectAuthEndpoint(wpIndex, base);
 
-  const wpRes = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: loginName, password }),
-  });
+  let { wpRes, data } = await requestToken(url, loginName, password);
 
-  const text = await wpRes.text();
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = { message: text };
+  if (!wpRes.ok && email && !username) {
+    const usernameFromCustomer = await findCustomerUsernameByEmail(email);
+    if (usernameFromCustomer && usernameFromCustomer !== loginName) {
+      ({ wpRes, data } = await requestToken(url, usernameFromCustomer, password));
+    }
   }
 
   const upstreamMessage = String(data?.message || "").slice(0, 200);
