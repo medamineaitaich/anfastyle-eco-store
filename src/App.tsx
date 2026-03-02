@@ -9,6 +9,7 @@ import { ThankYou } from './pages/ThankYou';
 import { About } from './pages/About';
 import { Contact } from './pages/Contact';
 import { Register } from './pages/Register';
+import { ResetPassword } from './pages/ResetPassword';
 import { UserProfile } from './pages/UserProfile';
 import { SearchResults } from './pages/SearchResults';
 import { FAQs, PrivacyPolicy, TermsOfService, Disclaimer } from './pages/Legal';
@@ -63,6 +64,7 @@ function getActivePageFromPath(pathname: string): string {
   if (pathname.startsWith('/about')) return 'about';
   if (pathname.startsWith('/contact')) return 'contact';
   if (pathname.startsWith('/account')) return 'account';
+  if (pathname.startsWith('/reset-password')) return 'account';
   if (pathname.startsWith('/search-results')) return 'search-results';
   if (pathname.startsWith('/faqs')) return 'faqs';
   if (pathname.startsWith('/privacy')) return 'privacy';
@@ -204,6 +206,7 @@ export default function App() {
             )
           }
         />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/search-results" element={<SearchResults results={searchResults} onSelectProduct={handleSelectProduct} />} />
         <Route path="/faqs" element={<FAQs />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
