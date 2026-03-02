@@ -10,6 +10,8 @@ interface CheckoutProps {
 }
 
 export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
+  const numericCustomerId = Number(user?.id);
+  const customerId = Number.isFinite(numericCustomerId) && numericCustomerId > 0 ? numericCustomerId : undefined;
   const adminUrl = import.meta.env.VITE_WP_ADMIN_URL;
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal > 75 ? 0 : 10;
@@ -22,6 +24,7 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
     first_name: user?.firstName || '',
     last_name: user?.lastName || '',
     email: user?.email || '',
+    customer_id: customerId,
     phone: '',
     address_1: user?.address || '',
     city: '',

@@ -15,6 +15,8 @@ export default async function handler(req, res) {
     const customer = body.customer || {};
     const items = Array.isArray(body.items) ? body.items : [];
     const notes = body.notes;
+    const numericCustomerId = Number(customer.customer_id);
+    const customerId = Number.isFinite(numericCustomerId) && numericCustomerId > 0 ? numericCustomerId : undefined;
 
     const requiredFields = [
       "first_name",
@@ -61,6 +63,7 @@ export default async function handler(req, res) {
       payment_method: "cod",
       payment_method_title: "Cash on delivery",
       set_paid: false,
+      customer_id: customerId,
       billing: {
         first_name: String(customer.first_name || ""),
         last_name: String(customer.last_name || ""),

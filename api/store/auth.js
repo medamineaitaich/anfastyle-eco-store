@@ -187,6 +187,157 @@ async function findCustomerUsernameByEmail(email) {
   return "";
 }
 
+async function findCustomerByEmail(email) {
+  if (!email) return null;
+  try {
+    const customers = await wooFetch("customers", { params: { email, per_page: 1 } });
+    if (Array.isArray(customers) && customers.length > 0) {
+      return customers[0];
+    }
+  } catch (e) {
+    console.warn(`[auth/login] customer profile lookup failed for email=${email}: ${e?.message || e}`);
+  }
+  return null;
+}
+
+function extractCookiesFromSetCookieHeader(rawSetCookie) {
+  const text = String(rawSetCookie || "");
+  if (!text) return [];
+  const out = [];
+  const regex = /(?:^|,)\s*([^=,\s;]+)=([^;]*)/g;
+  let match = regex.exec(text);
+  while (match) {
+    const name = String(match[1] || "").trim();
+    const value = String(match[2] || "").trim();
+    if (name && value !== "") {
+      out.push(`${name}=${value}`);
+    }
+    match = regex.exec(text);
+  }
+  return out;
+}
+
+function getResponseCookies(res) {
+  if (!res || !res.headers) return [];
+  const getSetCookie = res.headers.getSetCookie;
+  if (typeof getSetCookie === "function") {
+    const raw = getSetCookie.call(res.headers);
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw.flatMap(extractCookiesFromSetCookieHeader);
+    }
+  }
+  return extractCookiesFromSetCookieHeader(res.headers.get("set-cookie") || "");
+}
+
+function mergeCookieHeaders(...cookieHeaders) {
+  const jar = new Map();
+  for (const part of cookieHeaders) {
+    const pairs = Array.isArray(part) ? part : extractCookiesFromSetCookieHeader(part);
+    for (const pair of pairs) {
+      const idx = pair.indexOf("=");
+      if (idx <= 0) continue;
+      const name = pair.slice(0, idx).trim();
+      const value = pair.slice(idx + 1).trim();
+      if (!name) continue;
+      jar.set(name, value);
+    }
+  }
+  return Array.from(jar.entries()).map(([k, v]) => `${k}=${v}`).join("; ");
+}
+
+async function attemptWpFormLogin(base, loginName, password) {
+  const loginUrl = `${base}/wp-login.php`;
+  let initialCookies = [];
+  try {
+    const preflight = await fetch(loginUrl, { method: "GET", redirect: "manual" });
+    initialCookies = getResponseCookies(preflight);
+  } catch (e) {
+    console.warn(`[auth/login] wp-login preflight failed: ${e?.message || e}`);
+  }
+
+  const params = new URLSearchParams();
+  params.set("log", loginName);
+  params.set("pwd", password);
+  params.set("rememberme", "forever");
+  params.set("wp-submit", "Log In");
+  params.set("testcookie", "1");
+  params.set("redirect_to", `${base}/wp-admin/`);
+
+  const loginRes = await fetch(loginUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      ...(initialCookies.length > 0 ? { Cookie: initialCookies.join("; ") } : {}),
+    },
+    body: params.toString(),
+    redirect: "manual",
+  });
+
+  const loginCookies = getResponseCookies(loginRes);
+  const mergedCookies = mergeCookieHeaders(initialCookies, loginCookies);
+  const location = String(loginRes.headers.get("location") || "");
+  const hasLoggedInCookie = loginCookies.some((c) => /^wordpress_logged_in_/i.test(c));
+  const redirectedAwayFromLogin = (loginRes.status === 302 || loginRes.status === 303) && !!location && !/wp-login\.php/i.test(location);
+
+  if (hasLoggedInCookie || redirectedAwayFromLogin) {
+    return { ok: true, cookieHeader: mergedCookies };
+  }
+
+  let reason = "login_failed";
+  try {
+    const body = (await loginRes.text()).slice(0, 1200).toLowerCase();
+    if (/incorrect|invalid username|unknown email|invalid email address/.test(body)) {
+      reason = "invalid_credentials";
+    }
+  } catch {
+    // ignore body parse errors
+  }
+
+  return { ok: false, reason };
+}
+
+async function fetchMeByCookie(base, cookieHeader) {
+  if (!cookieHeader) return null;
+  const res = await fetch(`${base}/wp-json/wp/v2/users/me?context=edit`, {
+    headers: { Cookie: cookieHeader },
+  });
+  if (!res.ok) return null;
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+async function fallbackLoginWithoutJwt(base, loginNames, email, password) {
+  let lastReason = "login_failed";
+
+  for (const candidate of loginNames) {
+    const attempt = await attemptWpFormLogin(base, candidate, password);
+    if (!attempt.ok) {
+      lastReason = attempt.reason || "login_failed";
+      continue;
+    }
+
+    const me = await fetchMeByCookie(base, attempt.cookieHeader);
+    const resolvedEmail = String(me?.email || email || "").trim().toLowerCase();
+    const customer = resolvedEmail ? await findCustomerByEmail(resolvedEmail) : null;
+
+    return {
+      ok: true,
+      user: {
+        id: customer?.id ?? me?.id,
+        email: customer?.email ?? me?.email ?? resolvedEmail,
+        first_name: customer?.first_name ?? me?.first_name ?? "",
+        last_name: customer?.last_name ?? me?.last_name ?? "",
+      },
+    };
+  }
+
+  return { ok: false, reason: lastReason };
+}
+
 function extractLostPasswordNonce(html) {
   const match = String(html || "").match(/name=["']woocommerce-lost-password-nonce["']\s+value=["']([^"']+)["']/i);
   return match?.[1] || "";
@@ -385,6 +536,21 @@ async function handleLogin(req, res, body) {
   const upstreamMessage = String(final?.message || data?.message || "").slice(0, 200);
 
   if (!wpRes.ok && routeErrorEndpoint && endpoints.length === 1) {
+    console.warn(`[auth/login] jwt route missing at ${routeErrorEndpoint}; trying wp-login fallback`);
+    const fallback = await fallbackLoginWithoutJwt(base, loginNames, email, password);
+    if (fallback?.ok) {
+      return res.status(200).json({
+        source: "store-auth-login-wp-form",
+        token: null,
+        user: fallback.user,
+        message: "Login successful.",
+      });
+    }
+
+    if (fallback?.reason === "invalid_credentials") {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
     console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${routeErrorEndpoint} error="${upstreamMessage}"`);
     return res.status(500).json({ error: noRoutePluginError(routeErrorEndpoint) });
   }

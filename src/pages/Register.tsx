@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { apiUrl } from '../services/api';
+import { User } from '../types';
 
 interface RegisterProps {
-  onLogin: (user: any) => void;
+  onLogin: (user: User) => void;
 }
 
 export const Register = ({ onLogin }: RegisterProps) => {
@@ -65,16 +66,13 @@ export const Register = ({ onLogin }: RegisterProps) => {
           return;
         }
 
-        if (!data?.token) {
-          setMessage({ type: 'error', text: 'Login failed: missing token in response.' });
-          return;
-        }
-
         onLogin({
+          id: data?.user?.id,
           firstName: data?.user?.first_name || '',
           lastName: data?.user?.last_name || '',
           email: data?.user?.email || email,
           address: '',
+          token: data?.token,
         });
       } else {
         const res = await fetch(apiUrl('/api/store/auth?action=register'), {

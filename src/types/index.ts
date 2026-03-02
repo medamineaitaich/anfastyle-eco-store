@@ -18,10 +18,12 @@ export interface CartItem extends Product {
 }
 
 export interface User {
+  id?: number | string;
   firstName: string;
   lastName: string;
   email: string;
   address?: string;
+  token?: string;
 }
 
 export interface Order {

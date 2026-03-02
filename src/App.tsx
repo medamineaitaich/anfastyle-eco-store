@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { Home } from './pages/Home';
@@ -87,8 +87,16 @@ export default function App() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
   const { cart, isCartOpen, setIsCartOpen, addToCart, updateQuantity, removeFromCart, clearCart, cartCount } = useCart();
-  const { wishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const { user, setUser, orders, addOrder } = useAuth();
+  const wishlistUserKey = useMemo(() => {
+    if (!user) return null;
+    if (user.id !== undefined && user.id !== null && String(user.id).trim()) {
+      return `id:${String(user.id).trim()}`;
+    }
+    if (user.email) return `email:${String(user.email).trim().toLowerCase()}`;
+    return null;
+  }, [user]);
+  const { wishlist, addToWishlist, removeFromWishlist } = useWishlist(wishlistUserKey);
 
   useEffect(() => {
     setActivePage(getActivePageFromPath(location.pathname));
