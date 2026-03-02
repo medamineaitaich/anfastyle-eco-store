@@ -19,8 +19,9 @@ import { Popup } from './components/common/Popup';
 import { useCart } from './hooks/useCart';
 import { useWishlist } from './hooks/useWishlist';
 import { useAuth } from './hooks/useAuth';
-import { Product } from './types';
+import { Product, User } from './types';
 import { PRODUCTS as MOCK_PRODUCTS } from './data/products';
+import { clearSession, getSession, setSession } from './services/authStorage';
 
 function getPathForPage(page: string, selectedProduct?: Product | null): string {
   switch (page) {
@@ -85,6 +86,7 @@ export default function App() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [authToken, setAuthToken] = useState('');
 
   const { cart, isCartOpen, setIsCartOpen, addToCart, updateQuantity, removeFromCart, clearCart, cartCount } = useCart();
   const { user, setUser, orders, addOrder } = useAuth();
@@ -101,6 +103,21 @@ export default function App() {
   useEffect(() => {
     setActivePage(getActivePageFromPath(location.pathname));
   }, [location.pathname]);
+
+  useEffect(() => {
+    const session = getSession();
+    if (!session) {
+      setAuthToken('');
+      setUser(null);
+      return;
+    }
+
+    setAuthToken(session.token);
+    setUser({
+      ...session.user,
+      token: session.token,
+    });
+  }, [setUser]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -139,6 +156,21 @@ export default function App() {
     setSelectedProduct(product);
     setActivePage('product-detail');
     navigate(`/product/${product.id}`);
+  };
+
+  const handleSetAuthUser = (nextUser: User | null) => {
+    setUser(nextUser);
+
+    if (!nextUser) {
+      setAuthToken('');
+      clearSession();
+      return;
+    }
+
+    const token = String(nextUser.token || authToken || '');
+    const userWithToken = { ...nextUser, token };
+    setAuthToken(token);
+    setSession({ token, user: userWithToken });
   };
 
   useEffect(() => {
@@ -198,7 +230,7 @@ export default function App() {
             user ? (
               <UserProfile
                 user={user}
-                setUser={setUser}
+                setUser={handleSetAuthUser}
                 orders={orders}
                 wishlist={wishlist}
                 removeFromWishlist={removeFromWishlist}
@@ -206,8 +238,8 @@ export default function App() {
               />
             ) : (
               <Register
-                onLogin={(u: any) => {
-                  setUser(u);
+                onLogin={(u: User) => {
+                  handleSetAuthUser(u);
                   handleSetActivePage('account');
                 }}
               />
