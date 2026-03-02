@@ -488,9 +488,7 @@ async function submitNewPassword(base, state, password) {
 async function handleLogin(req, res, body) {
   const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
-  if (!email) return badRequest(res, "Email is required.");
-  if (!EMAIL_RE.test(email)) return badRequest(res, "Please enter a valid email address.");
-  if (!password) return badRequest(res, "Password is required.");
+  if (!email || !password) return badRequest(res, "Missing email or password");
 
   const base = getBaseUrl();
   const authUrl = `${base}/?rest_route=/simple-jwt-login/v1/auth`;
@@ -499,11 +497,7 @@ async function handleLogin(req, res, body) {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      email,
-      username: email,
-      password,
-    }),
+    body: JSON.stringify({ email, password }),
   });
 
   const rawText = await wpRes.text();
@@ -515,12 +509,7 @@ async function handleLogin(req, res, body) {
   }
 
   if (wpRes.status !== 200 || wpJson?.success !== true) {
-    const wpErrorMessage = String(
-      wpJson?.data?.message || wpJson?.message || wpJson?.error || "Invalid email or password"
-    ).trim();
-    return res.status(401).json({
-      error: wpErrorMessage || "Invalid email or password",
-    });
+    return res.status(401).json({ error: "Invalid email or password" });
   }
 
   const token = String(wpJson?.data?.jwt || "").trim();
@@ -528,12 +517,26 @@ async function handleLogin(req, res, body) {
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
+  let user = { id: null, email, first_name: "", last_name: "" };
+  try {
+    const customers = await wooFetch(`customers?email=${encodeURIComponent(email)}`, { method: "GET" });
+    if (Array.isArray(customers) && customers.length > 0) {
+      const customer = customers[0] || {};
+      user = {
+        id: customer?.id ?? null,
+        email: String(customer?.email || email),
+        first_name: String(customer?.first_name || ""),
+        last_name: String(customer?.last_name || ""),
+      };
+    }
+  } catch {
+    // Keep fallback user object when customer lookup fails.
+  }
+
   return res.status(200).json({
     source: "store-auth-login",
     token,
-    user: {
-      email,
-    },
+    user,
     message: "Login successful.",
   });
 }
