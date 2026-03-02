@@ -67,11 +67,15 @@ async function getWpIndex(base) {
   }
 }
 
-function detectAuthEndpoint(indexData, base) {
+function detectAuthEndpoints(indexData, base) {
   const routes = indexData?.routes || {};
-  if (routes["/jwt-auth/v1/token"]) return `${base}/wp-json/jwt-auth/v1/token`;
-  if (routes["/simple-jwt-login/v1/auth"]) return `${base}/wp-json/simple-jwt-login/v1/auth`;
-  return `${base}/wp-json/jwt-auth/v1/token`;
+  const endpoints = [];
+
+  if (routes["/jwt-auth/v1/token"]) endpoints.push(`${base}/wp-json/jwt-auth/v1/token`);
+  if (routes["/simple-jwt-login/v1/auth"]) endpoints.push(`${base}/wp-json/simple-jwt-login/v1/auth`);
+  if (endpoints.length === 0) endpoints.push(`${base}/wp-json/jwt-auth/v1/token`);
+
+  return endpoints;
 }
 
 async function fetchMe(base, token) {
@@ -92,11 +96,11 @@ function noRoutePluginError(authUrl) {
   return `WordPress auth endpoint is missing. Install/enable a JWT plugin exposing POST ${authUrl}.`;
 }
 
-async function requestToken(url, loginName, password) {
+async function authPost(url, { contentType, body }) {
   const wpRes = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: loginName, password }),
+    headers: { "Content-Type": contentType },
+    body,
   });
 
   const text = await wpRes.text();
@@ -108,6 +112,66 @@ async function requestToken(url, loginName, password) {
   }
 
   return { wpRes, data };
+}
+
+function getAuthAttempts(url, loginName, password) {
+  const isEmailLogin = EMAIL_RE.test(loginName);
+  const isSimpleJwt = url.includes("/simple-jwt-login/");
+
+  const jsonAttempts = [];
+  const formAttempts = [];
+
+  const addJson = (label, payload) => jsonAttempts.push({
+    label,
+    contentType: "application/json",
+    body: JSON.stringify(payload),
+  });
+
+  const addForm = (label, payload) => formAttempts.push({
+    label,
+    contentType: "application/x-www-form-urlencoded",
+    body: new URLSearchParams(payload).toString(),
+  });
+
+  if (isSimpleJwt && isEmailLogin) {
+    addJson("json-email", { email: loginName, password });
+  }
+  addJson("json-username", { username: loginName, password });
+  if (isEmailLogin && !isSimpleJwt) {
+    addJson("json-email", { email: loginName, password });
+  }
+  addJson("json-user_login", { user_login: loginName, password });
+  addJson("json-log-pwd", { log: loginName, pwd: password });
+
+  addForm("form-username", { username: loginName, password });
+  if (isEmailLogin) {
+    addForm("form-email", { email: loginName, password });
+  }
+  addForm("form-user_login", { user_login: loginName, password });
+  addForm("form-log-pwd", { log: loginName, pwd: password });
+
+  return [...jsonAttempts, ...formAttempts];
+}
+
+async function requestToken(url, loginName, password) {
+  const attempts = getAuthAttempts(url, loginName, password);
+  let last = { wpRes: { ok: false, status: 0 }, data: { message: "No auth attempts executed." }, method: "" };
+
+  for (const attempt of attempts) {
+    const result = await authPost(url, attempt);
+    last = { ...result, method: attempt.label };
+
+    if (result.wpRes.ok) {
+      return { ...result, method: attempt.label };
+    }
+
+    const message = String(result.data?.message || "");
+    if (message.includes("No route was found matching the URL and request method.")) {
+      return { ...result, method: attempt.label };
+    }
+  }
+
+  return last;
 }
 
 async function findCustomerUsernameByEmail(email) {
@@ -282,39 +346,63 @@ async function handleLogin(req, res, body) {
 
   const base = getBaseUrl();
   const wpIndex = await getWpIndex(base);
-  const url = detectAuthEndpoint(wpIndex, base);
-
-  let { wpRes, data } = await requestToken(url, loginName, password);
-
-  if (!wpRes.ok && email && !username) {
+  const endpoints = detectAuthEndpoints(wpIndex, base);
+  const loginNames = [loginName];
+  if (email && !username) {
     const usernameFromCustomer = await findCustomerUsernameByEmail(email);
     if (usernameFromCustomer && usernameFromCustomer !== loginName) {
-      ({ wpRes, data } = await requestToken(url, usernameFromCustomer, password));
+      loginNames.push(usernameFromCustomer);
     }
   }
 
-  const upstreamMessage = String(data?.message || "").slice(0, 200);
-  const routeError = upstreamMessage.includes("No route was found matching the URL and request method.");
+  let final = null;
+  let routeErrorEndpoint = "";
 
-  if (routeError) {
-    console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${url} error="${upstreamMessage}"`);
-    return res.status(500).json({ error: noRoutePluginError(url) });
+  for (const endpoint of endpoints) {
+    for (const candidate of loginNames) {
+      const result = await requestToken(endpoint, candidate, password);
+      const message = String(result.data?.message || "").slice(0, 200);
+      const routeError = message.includes("No route was found matching the URL and request method.");
+
+      if (routeError) {
+        routeErrorEndpoint = endpoint;
+        final = { ...result, endpoint, loginName: candidate, message };
+        continue;
+      }
+
+      if (result.wpRes.ok) {
+        final = { ...result, endpoint, loginName: candidate, message };
+        break;
+      }
+
+      final = { ...result, endpoint, loginName: candidate, message };
+    }
+    if (final?.wpRes?.ok) break;
+  }
+
+  const wpRes = final?.wpRes || { ok: false, status: 0 };
+  const data = final?.data || {};
+  const upstreamMessage = String(final?.message || data?.message || "").slice(0, 200);
+
+  if (!wpRes.ok && routeErrorEndpoint && endpoints.length === 1) {
+    console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${routeErrorEndpoint} error="${upstreamMessage}"`);
+    return res.status(500).json({ error: noRoutePluginError(routeErrorEndpoint) });
   }
 
   if (!wpRes.ok) {
-    console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${url} error="${upstreamMessage || "invalid credentials"}"`);
+    console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${final?.endpoint || endpoints[0]} login="${final?.loginName || loginName}" attempt="${final?.method || "unknown"}" error="${upstreamMessage || "invalid credentials"}"`);
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
   const token = data?.token || data?.jwt;
   if (!token) {
-    console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${url} error="missing token in successful auth response"`);
+    console.warn(`[auth/login] upstream=${wpRes.status} endpoint=${final?.endpoint || endpoints[0]} error="missing token in successful auth response"`);
     return res.status(401).json({ error: "Invalid email or password" });
   }
 
   const me = await fetchMe(base, token);
   if (!me) {
-    console.warn(`[auth/login] upstream=200 endpoint=${url} warning="token valid but /users/me unavailable"`);
+    console.warn(`[auth/login] upstream=200 endpoint=${final?.endpoint || endpoints[0]} warning="token valid but /users/me unavailable"`);
   }
 
   return res.status(200).json({
