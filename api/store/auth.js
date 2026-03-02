@@ -499,25 +499,31 @@ async function handleLogin(req, res, body) {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email,
+      username: email,
+      password,
+    }),
   });
 
   const rawText = await wpRes.text();
-  let data;
+  let wpJson;
   try {
-    data = JSON.parse(rawText);
+    wpJson = JSON.parse(rawText);
   } catch {
-    data = {};
+    wpJson = {};
   }
 
-  const wpError = String(data?.error || "").trim();
-  if (wpRes.status !== 200 || data?.success !== true) {
+  if (wpRes.status !== 200 || wpJson?.success !== true) {
+    const wpErrorMessage = String(
+      wpJson?.data?.message || wpJson?.message || wpJson?.error || "Invalid email or password"
+    ).trim();
     return res.status(401).json({
-      error: wpError || "Invalid email or password",
+      error: wpErrorMessage || "Invalid email or password",
     });
   }
 
-  const token = String(data?.data?.jwt || "").trim();
+  const token = String(wpJson?.data?.jwt || "").trim();
   if (!token) {
     return res.status(401).json({ error: "Invalid email or password" });
   }
