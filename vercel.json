@@ -1,6 +1,10 @@
 {
   "version": 2,
   "routes": [
+    { "src": "^/api/store/auth/login$", "dest": "/api/store/auth?action=login" },
+    { "src": "^/api/store/auth/register$", "dest": "/api/store/auth?action=register" },
+    { "src": "^/api/store/auth/forgot-password$", "dest": "/api/store/auth?action=forgot-password" },
+    { "src": "^/api/store/auth/reset-password$", "dest": "/api/store/auth?action=reset-password" },
     { "src": "^/api/(.*)$", "dest": "/api/$1" },
     { "handle": "filesystem" },
     { "src": "^/(?!api/)(?!.*\\.(?:js|css|png|jpg|jpeg|svg|ico|map|webp|gif|avif|woff|woff2|ttf|eot)$).*$", "dest": "/index.html" }
