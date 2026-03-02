@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { apiUrl } from '../services/api';
 import { User } from '../types';
+import { COUNTRY_OPTIONS, getStateOptions } from '../utils/location';
 
 interface RegisterProps {
   onLogin: (user: User) => void;
@@ -16,6 +17,10 @@ export const Register = ({ onLogin }: RegisterProps) => {
   const [password2, setPassword2] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [country, setCountry] = useState('US');
+  const [state, setState] = useState('');
+  const stateOptions = useMemo(() => getStateOptions(country), [country]);
+  const hasStateOptions = stateOptions.length > 0;
 
 
   const handleForgotPassword = async () => {
@@ -49,8 +54,18 @@ export const Register = ({ onLogin }: RegisterProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setMessage({ type: '', text: '' });
+    if (!isSignIn) {
+      if (!country) {
+        setMessage({ type: 'error', text: 'Country is required.' });
+        return;
+      }
+      if (hasStateOptions && !state) {
+        setMessage({ type: 'error', text: 'State/Province is required for the selected country.' });
+        return;
+      }
+    }
+    setIsLoading(true);
 
     try {
       if (isSignIn) {
@@ -82,6 +97,8 @@ export const Register = ({ onLogin }: RegisterProps) => {
             email,
             password,
             password2,
+            country,
+            state,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -160,28 +177,75 @@ export const Register = ({ onLogin }: RegisterProps) => {
               </div>
             )}
             {!isSignIn && (
-              <div className="space-y-2 text-left">
-                <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Confirm Password</label>
-                <div className="relative">
-                  <input
-                    required
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    title="Passwords must match"
-                    value={password2}
-                    onChange={(e) => setPassword2(e.target.value)}
-                    className="w-full px-6 py-4 pr-14 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
-                    placeholder="********"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword((v) => !v)}
-                    className="absolute inset-y-0 right-4 text-primary/60 hover:text-primary"
-                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                  >
-                    {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
+              <>
+                <div className="space-y-2 text-left">
+                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Confirm Password</label>
+                  <div className="relative">
+                    <input
+                      required
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      title="Passwords must match"
+                      value={password2}
+                      onChange={(e) => setPassword2(e.target.value)}
+                      className="w-full px-6 py-4 pr-14 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                      placeholder="********"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      className="absolute inset-y-0 right-4 text-primary/60 hover:text-primary"
+                      aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    >
+                      {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+                <div className="space-y-2 text-left">
+                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Country</label>
+                  <select
+                    required
+                    value={country}
+                    onChange={(e) => {
+                      setCountry(e.target.value);
+                      setState('');
+                    }}
+                    className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none appearance-none"
+                  >
+                    <option value="" disabled>Select country</option>
+                    {COUNTRY_OPTIONS.map((countryOption) => (
+                      <option key={countryOption.code} value={countryOption.code}>
+                        {countryOption.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2 text-left">
+                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">State/Province</label>
+                  {hasStateOptions ? (
+                    <select
+                      required
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none appearance-none"
+                    >
+                      <option value="" disabled>Select state/province</option>
+                      {stateOptions.map((stateOption) => (
+                        <option key={stateOption.code} value={stateOption.code}>
+                          {stateOption.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none"
+                      placeholder="State/Province (optional)"
+                    />
+                  )}
+                </div>
+              </>
             )}
             <button
               type="submit"

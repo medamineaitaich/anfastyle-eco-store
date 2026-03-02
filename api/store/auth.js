@@ -548,11 +548,14 @@ async function handleRegister(req, res, body) {
   const password = String(body.password || "");
   const password2 = String(body.password2 || "");
   const phone = String(body.phone || "").trim();
+  const country = String(body.country || "").trim().toUpperCase();
+  const state = String(body.state || "").trim();
 
   if (!email) return badRequest(res, "Email is required.");
   if (!EMAIL_RE.test(email)) return badRequest(res, "Please enter a valid email address.");
   if (!password) return badRequest(res, "Password is required.");
   if (!password2) return badRequest(res, "Password confirmation is required.");
+  if (!country) return badRequest(res, "Country is required.");
   if (password !== password2) return badRequest(res, "Passwords do not match.");
   if (!PASSWORD_RE.test(password)) {
     return badRequest(res, "Password must be at least 6 characters.");
@@ -577,6 +580,14 @@ async function handleRegister(req, res, body) {
           last_name: resolvedLastName,
           email,
           phone,
+          country,
+          state,
+        },
+        shipping: {
+          first_name: resolvedFirstName,
+          last_name: resolvedLastName,
+          country,
+          state,
         },
       },
     });

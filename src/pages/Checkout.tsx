@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { CartItem, User, Order } from '../types';
 import { apiUrl } from '../services/api';
+import { COUNTRY_OPTIONS, getStateOptions } from '../utils/location';
 
 interface CheckoutProps {
   cart: CartItem[];
@@ -29,8 +30,11 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
     address_1: user?.address || '',
     city: '',
     country: 'US',
+    state: '',
     postcode: '',
   });
+  const stateOptions = useMemo(() => getStateOptions(customer.country), [customer.country]);
+  const hasStateOptions = stateOptions.length > 0;
 
   const cartItems = useMemo(() => {
     return cart
@@ -47,8 +51,16 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
   }, [cart]);
 
   const handleCompleteOrder = async () => {
-    setIsLoading(true);
     setError('');
+    if (!customer.country) {
+      setError('Country is required.');
+      return;
+    }
+    if (hasStateOptions && !customer.state) {
+      setError('State/Province is required for the selected country.');
+      return;
+    }
+    setIsLoading(true);
 
     try {
       const res = await fetch(apiUrl('/api/store/checkout'), {
@@ -197,15 +209,50 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Country</label>
                   <select
+                    required
                     value={customer.country}
-                    onChange={(e) => setCustomer((v) => ({ ...v, country: e.target.value }))}
+                    onChange={(e) =>
+                      setCustomer((v) => ({
+                        ...v,
+                        country: e.target.value,
+                        state: '',
+                      }))
+                    }
                     className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none appearance-none"
                   >
-                    <option value="US">United States</option>
-                    <option value="CA">Canada</option>
-                    <option value="UK">United Kingdom</option>
-                    <option value="AU">Australia</option>
+                    <option value="" disabled>Select country</option>
+                    {COUNTRY_OPTIONS.map((countryOption) => (
+                      <option key={countryOption.code} value={countryOption.code}>
+                        {countryOption.name}
+                      </option>
+                    ))}
                   </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-widest text-primary/50">State/Province</label>
+                  {hasStateOptions ? (
+                    <select
+                      required
+                      value={customer.state}
+                      onChange={(e) => setCustomer((v) => ({ ...v, state: e.target.value }))}
+                      className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none appearance-none"
+                    >
+                      <option value="" disabled>Select state/province</option>
+                      {stateOptions.map((stateOption) => (
+                        <option key={stateOption.code} value={stateOption.code}>
+                          {stateOption.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={customer.state}
+                      onChange={(e) => setCustomer((v) => ({ ...v, state: e.target.value }))}
+                      className="w-full px-6 py-4 bg-cream/50 border border-primary/10 rounded-xl focus:outline-none"
+                      placeholder="State/Province (optional)"
+                    />
+                  )}
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Notes (Optional)</label>
