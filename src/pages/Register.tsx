@@ -27,7 +27,7 @@ export const Register = ({ onLogin }: RegisterProps) => {
     setMessage({ type: '', text: '' });
 
     try {
-      const res = await fetch(apiUrl('/api/store/auth/forgot-password'), {
+      const res = await fetch(apiUrl('/api/store/auth?action=forgot-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -53,7 +53,7 @@ export const Register = ({ onLogin }: RegisterProps) => {
 
     try {
       if (isSignIn) {
-        const res = await fetch(apiUrl('/api/store/auth/login'), {
+        const res = await fetch(apiUrl('/api/store/auth?action=login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
@@ -77,7 +77,7 @@ export const Register = ({ onLogin }: RegisterProps) => {
           address: '',
         });
       } else {
-        const res = await fetch(apiUrl('/api/store/auth/register'), {
+        const res = await fetch(apiUrl('/api/store/auth?action=register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

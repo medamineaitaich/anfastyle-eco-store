@@ -41,7 +41,7 @@ export const ResetPassword = () => {
 
     setIsLoading(true);
     try {
-      const res = await fetch(apiUrl('/api/store/auth/reset-password'), {
+      const res = await fetch(apiUrl('/api/store/auth?action=reset-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
