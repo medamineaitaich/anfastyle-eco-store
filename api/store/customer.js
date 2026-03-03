@@ -181,18 +181,24 @@ async function resolveCustomer(token, validateData) {
   const payloadEmail = extractEmail(jwtPayload);
   const email = validatedEmail || payloadEmail;
 
-  if (validatedUserId) {
-    try {
-      const customer = await wooFetch(`customers/${validatedUserId}`);
-      if (customer?.id) return customer;
-    } catch {
-      // Continue with email lookup.
-    }
-  }
-
   if (email) {
     const customer = await findCustomerByEmail(email);
     if (customer?.id) return customer;
+  }
+
+  if (validatedUserId) {
+    try {
+      const customer = await wooFetch(`customers/${validatedUserId}`);
+      if (!customer?.id) return null;
+
+      const customerEmail = String(customer?.email || "").trim().toLowerCase();
+      if (email && customerEmail && customerEmail !== email) {
+        return null;
+      }
+      return customer;
+    } catch {
+      return null;
+    }
   }
 
   return null;

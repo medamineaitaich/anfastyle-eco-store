@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { CartItem, User, Order } from '../types';
 import { apiUrl } from '../services/api';
 import { COUNTRY_OPTIONS, getStateOptions } from '../utils/location';
@@ -11,9 +12,9 @@ interface CheckoutProps {
 }
 
 export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
+  const navigate = useNavigate();
   const numericCustomerId = Number(user?.id);
   const customerId = Number.isFinite(numericCustomerId) && numericCustomerId > 0 ? numericCustomerId : undefined;
-  const adminUrl = import.meta.env.VITE_WP_ADMIN_URL;
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal > 75 ? 0 : 10;
   const total = subtotal + shipping;
@@ -106,20 +107,17 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white p-10 rounded-3xl shadow-sm text-center space-y-4">
             <h1 className="text-4xl font-serif">Order Placed</h1>
-            <p className="text-primary/70">Your WooCommerce order has been created successfully.</p>
+            <p className="text-primary/70">Your order has been created successfully.</p>
             <p className="text-sm text-primary/60">Order ID: <span className="font-bold text-primary">{successOrder.id}</span></p>
             <p className="text-sm text-primary/60">Total: <span className="font-bold text-primary">${successOrder.total}</span></p>
-            {/* Admin helper (not for customers) */}
-            {adminUrl && (
-              <a
-                href={`${adminUrl}/post.php?post=${successOrder.id}&action=edit`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block text-sm text-primary underline"
+            <div className="pt-2">
+              <button
+                onClick={() => navigate('/account')}
+                className="inline-flex items-center justify-center bg-primary text-cream px-8 py-3 rounded-full font-bold uppercase tracking-widest hover:bg-accent transition-all"
               >
-                View in WooCommerce (admin)
-              </a>
-            )}
+                View My Orders
+              </button>
+            </div>
           </div>
         </div>
       </div>
