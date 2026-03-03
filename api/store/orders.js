@@ -372,7 +372,7 @@ export default async function handler(req, res) {
       body: {
         reason,
         amount: requestedAmount.toFixed(2),
-        api_refund: true,
+        api_refund: false,
       },
     });
 
