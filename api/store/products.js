@@ -9,6 +9,7 @@ function cleanListItem(p) {
     sale_price: p.sale_price,
     on_sale: p.on_sale,
     stock_status: p.stock_status,
+    short_description: p.short_description,
     categories: (p.categories || []).map((c) => ({ id: c.id, name: c.name, slug: c.slug })),
     image: p.images?.[0]
       ? { src: p.images[0].src, thumbnail: p.images[0].thumbnail || p.images[0].src, alt: p.images[0].alt || "" }

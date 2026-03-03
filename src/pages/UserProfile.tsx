@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { User as UserIcon, Package, Heart, Settings, LogOut, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Order, Product } from '../types';
+import { fetchCustomerProfile, updateCustomerProfile } from '../services/customer';
+import { COUNTRY_OPTIONS, getStateOptions } from '../utils/location';
 
 interface UserProfileProps {
   user: User;
@@ -12,18 +14,114 @@ interface UserProfileProps {
   setActivePage: (page: string) => void;
 }
 
+interface ProfileFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  billingAddress: string;
+  shippingAddress: string;
+  city: string;
+  postcode: string;
+  country: string;
+  state: string;
+}
+
+function getInitialFormData(user: User): ProfileFormData {
+  const fallbackAddress = String(user.address || '').trim();
+  const billingAddress = String(user.billingAddress || fallbackAddress).trim();
+  const shippingAddress = String(user.shippingAddress || fallbackAddress || billingAddress).trim();
+
+  return {
+    firstName: String(user.firstName || ''),
+    lastName: String(user.lastName || ''),
+    email: String(user.email || ''),
+    phone: String(user.phone || ''),
+    billingAddress,
+    shippingAddress,
+    city: String(user.city || ''),
+    postcode: String(user.postcode || ''),
+    country: String(user.country || 'US').toUpperCase(),
+    state: String(user.state || ''),
+  };
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return 'Unable to save profile right now. Please try again.';
+}
+
 export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlist, setActivePage }: UserProfileProps) => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({ ...user });
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState<ProfileFormData>(() => getInitialFormData(user));
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  const handleUpdateProfile = (e: React.FormEvent) => {
+  const stateOptions = useMemo(() => getStateOptions(formData.country), [formData.country]);
+  const hasStateOptions = stateOptions.length > 0;
+
+  useEffect(() => {
+    if (isEditing) return;
+    setFormData(getInitialFormData(user));
+  }, [isEditing, user]);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUser(formData);
-    setIsEditing(false);
-    setMessage({ type: 'success', text: 'Profile updated successfully!' });
-    setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    setMessage({ type: '', text: '' });
+
+    if (!formData.country) {
+      setMessage({ type: 'error', text: 'Country is required.' });
+      return;
+    }
+    if (hasStateOptions && !formData.state) {
+      setMessage({ type: 'error', text: 'State/Province is required for the selected country.' });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const updated = await updateCustomerProfile({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        city: formData.city,
+        postcode: formData.postcode,
+        country: formData.country,
+        state: formData.state,
+        billingAddress: formData.billingAddress,
+        shippingAddress: formData.shippingAddress,
+      });
+
+      const updatedUser = {
+        ...user,
+        ...updated,
+        token: user.token,
+      };
+      setUser(updatedUser);
+
+      try {
+        const refreshed = await fetchCustomerProfile();
+        const refreshedUser = {
+          ...updatedUser,
+          ...refreshed,
+          token: user.token,
+        };
+        setUser(refreshedUser);
+        setFormData(getInitialFormData(refreshedUser));
+      } catch {
+        setFormData(getInitialFormData(updatedUser));
+      }
+
+      setIsEditing(false);
+      setMessage({ type: 'success', text: 'Profile updated successfully.' });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error) });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleLogout = () => {
@@ -35,7 +133,6 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
     <div className="py-20 bg-cream min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row gap-12">
-          {/* Sidebar */}
           <aside className="w-full md:w-64 space-y-2">
             <div className="p-6 bg-white rounded-3xl shadow-sm mb-6">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-4 mx-auto">
@@ -44,29 +141,29 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
               <h3 className="text-center font-bold">{user.firstName} {user.lastName}</h3>
               <p className="text-center text-xs text-primary/40 truncate">{user.email}</p>
             </div>
-            
-            <button 
+
+            <button
               onClick={() => setActiveTab('profile')}
               className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all ${activeTab === 'profile' ? 'bg-primary text-cream shadow-lg' : 'hover:bg-primary/5 text-primary/70'}`}
             >
               <UserIcon size={20} />
               <span className="font-bold text-sm uppercase tracking-widest">Profile</span>
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('orders')}
               className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all ${activeTab === 'orders' ? 'bg-primary text-cream shadow-lg' : 'hover:bg-primary/5 text-primary/70'}`}
             >
               <Package size={20} />
               <span className="font-bold text-sm uppercase tracking-widest">Orders</span>
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('wishlist')}
               className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all ${activeTab === 'wishlist' ? 'bg-primary text-cream shadow-lg' : 'hover:bg-primary/5 text-primary/70'}`}
             >
               <Heart size={20} />
               <span className="font-bold text-sm uppercase tracking-widest">Wishlist</span>
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('settings')}
               className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all ${activeTab === 'settings' ? 'bg-primary text-cream shadow-lg' : 'hover:bg-primary/5 text-primary/70'}`}
             >
@@ -74,7 +171,7 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
               <span className="font-bold text-sm uppercase tracking-widest">Settings</span>
             </button>
             <div className="pt-8">
-              <button 
+              <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-red-500 hover:bg-red-50 transition-all"
               >
@@ -84,7 +181,6 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
             </div>
           </aside>
 
-          {/* Main Content */}
           <main className="flex-grow">
             <AnimatePresence mode="wait">
               {activeTab === 'profile' && (
@@ -98,7 +194,7 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                   <div className="flex justify-between items-center mb-8">
                     <h2 className="text-3xl font-serif">My Profile</h2>
                     {!isEditing && (
-                      <button 
+                      <button
                         onClick={() => setIsEditing(true)}
                         className="text-sm font-bold uppercase tracking-widest text-secondary hover:underline"
                       >
@@ -117,58 +213,147 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                   <form onSubmit={handleUpdateProfile} className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-widest text-primary/50">First Name</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         disabled={!isEditing}
                         value={formData.firstName}
-                        onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50" 
+                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50"
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Last Name</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         disabled={!isEditing}
                         value={formData.lastName}
-                        onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50" 
+                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50"
                       />
                     </div>
                     <div className="md:col-span-2 space-y-2">
                       <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Email Address</label>
-                      <input 
-                        type="email" 
+                      <input
+                        type="email"
                         disabled={!isEditing}
                         value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50" 
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Phone</label>
+                      <input
+                        type="tel"
+                        disabled={!isEditing}
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-primary/50">City</label>
+                      <input
+                        type="text"
+                        disabled={!isEditing}
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Postal Code</label>
+                      <input
+                        type="text"
+                        disabled={!isEditing}
+                        value={formData.postcode}
+                        onChange={(e) => setFormData({ ...formData, postcode: e.target.value })}
+                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Country</label>
+                      <select
+                        disabled={!isEditing}
+                        value={formData.country}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            country: e.target.value,
+                            state: '',
+                          })
+                        }
+                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50 appearance-none"
+                      >
+                        <option value="" disabled>Select country</option>
+                        {COUNTRY_OPTIONS.map((countryOption) => (
+                          <option key={countryOption.code} value={countryOption.code}>
+                            {countryOption.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-primary/50">State/Province</label>
+                      {hasStateOptions ? (
+                        <select
+                          disabled={!isEditing}
+                          value={formData.state}
+                          onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                          className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50 appearance-none"
+                        >
+                          <option value="" disabled>Select state/province</option>
+                          {stateOptions.map((stateOption) => (
+                            <option key={stateOption.code} value={stateOption.code}>
+                              {stateOption.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          disabled={!isEditing}
+                          value={formData.state}
+                          onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                          className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50"
+                          placeholder="State/Province (optional)"
+                        />
+                      )}
+                    </div>
+                    <div className="md:col-span-2 space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Billing Address</label>
+                      <input
+                        type="text"
+                        disabled={!isEditing}
+                        value={formData.billingAddress}
+                        onChange={(e) => setFormData({ ...formData, billingAddress: e.target.value })}
+                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50"
                       />
                     </div>
                     <div className="md:col-span-2 space-y-2">
                       <label className="text-xs font-bold uppercase tracking-widest text-primary/50">Shipping Address</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         disabled={!isEditing}
-                        value={formData.address || ''}
-                        onChange={(e) => setFormData({...formData, address: e.target.value})}
-                        placeholder="123 Nature Way, Eco City, 90210"
-                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50" 
+                        value={formData.shippingAddress}
+                        onChange={(e) => setFormData({ ...formData, shippingAddress: e.target.value })}
+                        className="w-full px-6 py-4 bg-cream/30 border border-primary/10 rounded-xl focus:outline-none disabled:opacity-50"
                       />
                     </div>
                     {isEditing && (
                       <div className="md:col-span-2 flex gap-4 pt-4">
-                        <button 
+                        <button
                           type="submit"
-                          className="bg-primary text-cream px-10 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-accent transition-all"
+                          disabled={isSaving}
+                          className="bg-primary text-cream px-10 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-accent transition-all disabled:opacity-50 flex items-center justify-center min-w-40"
                         >
-                          Save Changes
+                          {isSaving ? <span className="w-5 h-5 border-2 border-cream/30 border-t-cream rounded-full animate-spin" /> : 'Save Changes'}
                         </button>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => {
                             setIsEditing(false);
-                            setFormData({...user});
+                            setFormData(getInitialFormData(user));
                           }}
                           className="bg-cream text-primary px-10 py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-primary/5 transition-all"
                         >
@@ -193,7 +378,7 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                     <div className="bg-white p-20 rounded-3xl shadow-sm text-center">
                       <Package size={48} className="mx-auto mb-6 text-primary/10" />
                       <p className="text-primary/40 mb-8">You haven't placed any orders yet.</p>
-                      <button 
+                      <button
                         onClick={() => setActivePage('catalog')}
                         className="text-sm font-bold uppercase tracking-widest border-b-2 border-primary pb-1"
                       >
@@ -260,7 +445,7 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                     <div className="text-center py-10">
                       <Heart size={48} className="mx-auto mb-6 text-primary/10" />
                       <p className="text-primary/40 mb-8">Your wishlist is empty.</p>
-                      <button 
+                      <button
                         onClick={() => setActivePage('catalog')}
                         className="text-sm font-bold uppercase tracking-widest border-b-2 border-primary pb-1"
                       >
@@ -273,8 +458,8 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                         <div key={product.id} className="group">
                           <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-cream/30 mb-4">
                             <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                            <button 
-                              onClick={() => removeFromWishlist(product.id)}
+                            <button
+                              onClick={() => removeFromWishlist(String(product.id))}
                               className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-sm rounded-full text-red-500 hover:bg-red-50 transition-all"
                             >
                               <Trash2 size={16} />
@@ -282,14 +467,11 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                           </div>
                           <h4 className="font-medium text-sm mb-1">{product.name}</h4>
                           <p className="text-sm font-bold">${product.price.toFixed(2)}</p>
-                          <button 
-                            onClick={() => {
-                              setActivePage('product-detail');
-                              // This would need to pass the product back up
-                            }}
+                          <button
+                            onClick={() => setActivePage('catalog')}
                             className="mt-4 w-full py-3 bg-primary/5 text-primary text-[10px] font-bold uppercase tracking-widest rounded-xl hover:bg-primary hover:text-cream transition-all"
                           >
-                            View Product
+                            Browse Catalog
                           </button>
                         </div>
                       ))}
@@ -313,28 +495,13 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                       <div className="flex justify-between items-center">
                         <div>
                           <p className="font-medium">Password</p>
-                          <p className="text-xs text-primary/40">Last changed 3 months ago</p>
+                          <p className="text-xs text-primary/40">Use the forgot-password flow on the sign-in page.</p>
                         </div>
-                        <button className="text-xs font-bold uppercase tracking-widest text-secondary hover:underline">Change Password</button>
                       </div>
                     </section>
                     <section className="space-y-4">
                       <h4 className="text-sm font-bold uppercase tracking-widest text-primary/40 pb-2 border-b border-primary/5">Notifications</h4>
-                      <div className="flex justify-between items-center">
-                        <p className="font-medium">Email Newsletter</p>
-                        <div className="w-12 h-6 bg-secondary rounded-full relative cursor-pointer">
-                          <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <p className="font-medium">Order Updates</p>
-                        <div className="w-12 h-6 bg-secondary rounded-full relative cursor-pointer">
-                          <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
-                        </div>
-                      </div>
-                    </section>
-                    <section className="space-y-4 pt-8">
-                      <button className="text-xs font-bold uppercase tracking-widest text-red-500 hover:underline">Delete Account</button>
+                      <p className="text-sm text-primary/60">Newsletter and order notifications are managed by your email preferences.</p>
                     </section>
                   </div>
                 </motion.div>

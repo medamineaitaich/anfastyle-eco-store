@@ -23,6 +23,13 @@ export interface User {
   lastName: string;
   email: string;
   address?: string;
+  phone?: string;
+  city?: string;
+  postcode?: string;
+  country?: string;
+  state?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
   token?: string;
 }
 

@@ -23,6 +23,8 @@ import { useAuth } from './hooks/useAuth';
 import { Product, User } from './types';
 import { PRODUCTS as MOCK_PRODUCTS } from './data/products';
 import { clearSession, getSession, setSession } from './services/authStorage';
+import { fetchCustomerProfile } from './services/customer';
+import { ApiError } from './services/http';
 
 function getPathForPage(page: string, selectedProduct?: Product | null): string {
   switch (page) {
@@ -98,19 +100,59 @@ export default function App() {
   }, [location.pathname]);
 
   useEffect(() => {
-    const session = getSession();
-    if (!session) {
+    let mounted = true;
+    const hydrateSession = async () => {
+      const session = getSession();
+      if (!session) {
+        setAuthToken('');
+        setUser(null);
+        return;
+      }
+
+      const cachedUser = {
+        ...session.user,
+        token: session.token,
+      };
+      setAuthToken(session.token);
+      setUser(cachedUser);
+
+      try {
+        const freshProfile = await fetchCustomerProfile();
+        if (!mounted) return;
+        const nextUser = { ...cachedUser, ...freshProfile, token: session.token };
+        setUser(nextUser);
+        setSession({ token: session.token, user: nextUser });
+      } catch (error) {
+        if (!mounted) return;
+        if (error instanceof ApiError && error.status === 401) {
+          setAuthToken('');
+          setUser(null);
+          clearSession();
+        }
+      }
+    };
+
+    hydrateSession();
+    return () => {
+      mounted = false;
+    };
+  }, [setUser]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleAuthExpired = () => {
       setAuthToken('');
       setUser(null);
-      return;
-    }
+      clearSession();
+      navigate('/account');
+    };
 
-    setAuthToken(session.token);
-    setUser({
-      ...session.user,
-      token: session.token,
-    });
-  }, [setUser]);
+    window.addEventListener('auth:expired', handleAuthExpired);
+    return () => {
+      window.removeEventListener('auth:expired', handleAuthExpired);
+    };
+  }, [navigate, setUser]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -164,6 +206,22 @@ export default function App() {
     const userWithToken = { ...nextUser, token };
     setAuthToken(token);
     setSession({ token, user: userWithToken });
+
+    if (token) {
+      void fetchCustomerProfile()
+        .then((freshProfile) => {
+          const merged = { ...userWithToken, ...freshProfile, token };
+          setUser(merged);
+          setSession({ token, user: merged });
+        })
+        .catch((error) => {
+          if (error instanceof ApiError && error.status === 401) {
+            setAuthToken('');
+            setUser(null);
+            clearSession();
+          }
+        });
+    }
   };
 
   useEffect(() => {

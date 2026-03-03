@@ -1,4 +1,4 @@
-import { User, Order } from '../types';
+import { User, Order, Product } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 export const apiUrl = (path: string) => `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
@@ -85,15 +85,17 @@ export async function fetchStoreProduct(id: number | string) {
   if (!productRes.ok) throw new Error(await productRes.text());
   const productData = await productRes.json();
 
-  let variations: any[] = [];
-  try {
-    const variationsRes = await fetch(apiUrl(`/api/products/${id}/variations?per_page=100&page=1&t=${Date.now()}`));
-    if (variationsRes.ok) {
-      const rawVariations = await variationsRes.json();
-      variations = Array.isArray(rawVariations) ? rawVariations : [];
+  let variations: any[] = Array.isArray(productData?.variations) ? productData.variations : [];
+  if (variations.length === 0) {
+    try {
+      const variationsRes = await fetch(apiUrl(`/api/products/${id}/variations?per_page=100&page=1&t=${Date.now()}`));
+      if (variationsRes.ok) {
+        const rawVariations = await variationsRes.json();
+        variations = Array.isArray(rawVariations) ? rawVariations : [];
+      }
+    } catch {
+      variations = [];
     }
-  } catch {
-    variations = [];
   }
 
   return {
@@ -121,6 +123,17 @@ export async function fetchStoreProducts(params: {
   if (params.on_sale !== undefined) qs.set("on_sale", String(params.on_sale));
 
   return fetchJson(apiUrl(`/api/store/products?${qs.toString()}`)) as Promise<{ source: string; page: number; per_page: number; total: number; totalPages: number; items: any[] }>;
+}
+
+export function mapStoreListItemToProduct(p: any): Product {
+  return {
+    id: String(p.id),
+    name: String(p.name ?? p.title ?? ''),
+    price: Number((p.on_sale ? p.sale_price : (p.price ?? p.regular_price)) ?? 0),
+    image: String(p.image?.src ?? p.images?.[0]?.src ?? 'https://picsum.photos/seed/placeholder/600/800'),
+    category: String(p.categories?.[0]?.name ?? 'Uncategorized'),
+    description: String(p.short_description ?? ''),
+  };
 }
 
 export async function fetchStoreCategories() {

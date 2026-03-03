@@ -14,7 +14,10 @@ function cleanProduct(p) {
     on_sale: p.on_sale,
     stock_status: p.stock_status,
     stock_quantity: p.stock_quantity,
+    average_rating: p.average_rating,
+    rating_count: p.rating_count,
     sku: p.sku,
+    attributes: p.attributes || [],
     images: (p.images || []).map((img) => ({
       id: img.id,
       src: img.src,
@@ -40,7 +43,7 @@ function cleanVariation(v) {
     stock_quantity: v.stock_quantity,
     sku: v.sku,
     attributes: v.attributes || [],
-    image: v.image ? { id: v.image.id, src: v.image.src, alt: v.image.alt || "" } : null,
+    image: v.image ? { id: v.image.id, src: v.image.src, thumbnail: v.image.thumbnail || v.image.src, alt: v.image.alt || "" } : null,
   };
 }
 

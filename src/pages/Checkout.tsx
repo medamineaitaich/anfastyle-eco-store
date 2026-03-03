@@ -26,12 +26,12 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
     last_name: user?.lastName || '',
     email: user?.email || '',
     customer_id: customerId,
-    phone: '',
-    address_1: user?.address || '',
-    city: '',
-    country: 'US',
-    state: '',
-    postcode: '',
+    phone: user?.phone || '',
+    address_1: user?.shippingAddress || user?.address || '',
+    city: user?.city || '',
+    country: user?.country || 'US',
+    state: user?.state || '',
+    postcode: user?.postcode || '',
   });
   const stateOptions = useMemo(() => getStateOptions(customer.country), [customer.country]);
   const hasStateOptions = stateOptions.length > 0;

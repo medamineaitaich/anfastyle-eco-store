@@ -1,17 +1,5 @@
 import { wooFetch } from "../_lib/woo.js";
 
-const WISHLIST_META_KEY = "wishlist_product_ids";
-
-function getWpBaseUrl() {
-  const base = String(process.env.WP_URL || process.env.WC_URL || process.env.WOOCOMMERCE_URL || "")
-    .replace(/\/$/, "")
-    .replace(/\/wp-json\/wc\/v3$/i, "")
-    .replace(/\/wp-json\/?$/i, "")
-    .replace(/\/$/, "");
-  if (!base) throw new Error("Store auth is not configured on the server.");
-  return base;
-}
-
 function parseBody(req) {
   if (typeof req.body === "string") {
     try {
@@ -27,6 +15,21 @@ function getBearerToken(req) {
   const header = String(req.headers?.authorization || req.headers?.Authorization || "").trim();
   if (!header.toLowerCase().startsWith("bearer ")) return "";
   return header.slice(7).trim();
+}
+
+function normalizeWpBase(rawBase) {
+  return String(rawBase || "")
+    .replace(/\/$/, "")
+    .replace(/\/wp-json\/wc\/v3$/i, "")
+    .replace(/\/wp-json\/?$/i, "")
+    .replace(/\/$/, "");
+}
+
+function getWpBaseUrl() {
+  const raw = process.env.WP_URL || process.env.WC_URL || process.env.WOOCOMMERCE_URL || "";
+  const base = normalizeWpBase(raw);
+  if (!base) throw new Error("Store auth is not configured on the server.");
+  return base;
 }
 
 function decodeJwtPayloadSafely(token) {
@@ -80,8 +83,8 @@ function extractEmail(...sources) {
   return "";
 }
 
-async function validateTokenRequest(authUrl, token) {
-  const res = await fetch(authUrl, {
+async function validateTokenRequest(url, token) {
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -96,11 +99,11 @@ async function validateTokenRequest(authUrl, token) {
     data = {};
   }
 
-  const success =
+  const valid =
     res.ok &&
     (data?.success === true || data?.data?.success === true || data?.data?.is_valid === true || data?.is_valid === true);
 
-  return { valid: Boolean(success), data, status: res.status };
+  return { valid: Boolean(valid), data, status: res.status };
 }
 
 async function validateToken(base, token) {
@@ -118,7 +121,6 @@ async function validateToken(base, token) {
       // Try next endpoint.
     }
   }
-
   return last;
 }
 
@@ -143,7 +145,7 @@ async function resolveCustomer(token, validateData) {
       const customer = await wooFetch(`customers/${validatedUserId}`);
       if (customer?.id) return customer;
     } catch {
-      // Fall back to email-based lookup if the validated id is not a Woo customer id.
+      // Continue with email lookup.
     }
   }
 
@@ -155,69 +157,74 @@ async function resolveCustomer(token, validateData) {
   return null;
 }
 
-function parseWishlistIds(rawValue) {
-  if (Array.isArray(rawValue)) {
-    return rawValue
-      .map((v) => Number(v))
-      .filter((v) => Number.isFinite(v) && v > 0);
-  }
-
-  if (typeof rawValue === "string" && rawValue.trim()) {
-    try {
-      const parsed = JSON.parse(rawValue);
-      if (Array.isArray(parsed)) {
-        return parsed
-          .map((v) => Number(v))
-          .filter((v) => Number.isFinite(v) && v > 0);
-      }
-    } catch {
-      // Ignore invalid JSON meta values.
-    }
-  }
-
-  return [];
+function toString(value) {
+  return String(value ?? "").trim();
 }
 
-function uniqueIds(ids) {
-  return Array.from(new Set(ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)));
-}
+function normalizeCustomer(customer) {
+  const billing = customer?.billing || {};
+  const shipping = customer?.shipping || {};
 
-function getWishlistFromCustomer(customer) {
-  const metaData = Array.isArray(customer?.meta_data) ? customer.meta_data : [];
-  const entry = metaData.find((item) => String(item?.key || "") === WISHLIST_META_KEY);
-  return uniqueIds(parseWishlistIds(entry?.value));
-}
-
-async function saveWishlistForCustomer(customer, ids) {
-  const metaData = Array.isArray(customer?.meta_data) ? customer.meta_data : [];
-  const remainingMeta = metaData.filter((item) => String(item?.key || "") !== WISHLIST_META_KEY);
-  const payloadMeta = [
-    ...remainingMeta,
-    {
-      key: WISHLIST_META_KEY,
-      value: JSON.stringify(uniqueIds(ids)),
+  return {
+    id: customer?.id ?? null,
+    email: toString(customer?.email),
+    first_name: toString(customer?.first_name),
+    last_name: toString(customer?.last_name),
+    billing: {
+      phone: toString(billing?.phone),
+      address_1: toString(billing?.address_1),
+      city: toString(billing?.city),
+      postcode: toString(billing?.postcode),
+      country: toString(billing?.country).toUpperCase(),
+      state: toString(billing?.state),
     },
-  ];
+    shipping: {
+      address_1: toString(shipping?.address_1),
+      city: toString(shipping?.city),
+      postcode: toString(shipping?.postcode),
+      country: toString(shipping?.country).toUpperCase(),
+      state: toString(shipping?.state),
+    },
+  };
+}
 
-  const updated = await wooFetch(`customers/${customer.id}`, {
-    method: "PUT",
-    body: { meta_data: payloadMeta },
-  });
+function pickAddressPayload(raw, type) {
+  if (!raw || typeof raw !== "object") return undefined;
 
-  return getWishlistFromCustomer(updated);
+  const common = {
+    first_name: toString(raw.first_name),
+    last_name: toString(raw.last_name),
+    address_1: toString(raw.address_1),
+    city: toString(raw.city),
+    postcode: toString(raw.postcode),
+    country: toString(raw.country).toUpperCase(),
+    state: toString(raw.state),
+  };
+
+  const payload =
+    type === "billing"
+      ? {
+          ...common,
+          email: toString(raw.email),
+          phone: toString(raw.phone),
+        }
+      : common;
+
+  if (!Object.values(payload).some(Boolean)) return undefined;
+  return payload;
 }
 
 export default async function handler(req, res) {
   try {
     res.setHeader("Cache-Control", "no-store");
 
-    if (req.method !== "GET" && req.method !== "POST") {
+    if (req.method !== "GET" && req.method !== "PUT") {
       return res.status(405).json({ error: "Method not allowed" });
     }
 
     const token = getBearerToken(req);
     if (!token) {
-      return res.status(401).json({ error: "Please sign in to use wishlist." });
+      return res.status(401).json({ error: "Please sign in to continue." });
     }
 
     const base = getWpBaseUrl();
@@ -228,13 +235,13 @@ export default async function handler(req, res) {
 
     const customer = await resolveCustomer(token, tokenValidation.data);
     if (!customer?.id) {
-      return res.status(404).json({ error: "Customer not found for this token." });
+      return res.status(404).json({ error: "Customer profile not found." });
     }
 
     if (req.method === "GET") {
       return res.status(200).json({
-        source: "store-wishlist",
-        wishlist: getWishlistFromCustomer(customer),
+        source: "store-customer",
+        user: normalizeCustomer(customer),
       });
     }
 
@@ -243,27 +250,34 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid JSON body." });
     }
 
-    const productId = Number(body.product_id);
-    const action = String(body.action || "").trim().toLowerCase();
-    if (!Number.isFinite(productId) || productId <= 0) {
-      return res.status(400).json({ error: "Invalid product_id." });
-    }
-    if (action !== "add" && action !== "remove") {
-      return res.status(400).json({ error: "Invalid action. Use add or remove." });
+    const first_name = toString(body.first_name);
+    const last_name = toString(body.last_name);
+    const email = toString(body.email).toLowerCase();
+    const billing = pickAddressPayload(body.billing, "billing");
+    const shipping = pickAddressPayload(body.shipping, "shipping");
+
+    const payload = {};
+    if (first_name) payload.first_name = first_name;
+    if (last_name) payload.last_name = last_name;
+    if (email) payload.email = email;
+    if (billing) payload.billing = billing;
+    if (shipping) payload.shipping = shipping;
+
+    if (Object.keys(payload).length === 0) {
+      return res.status(400).json({ error: "No profile fields to update." });
     }
 
-    const current = getWishlistFromCustomer(customer);
-    const next =
-      action === "add"
-        ? uniqueIds([...current, productId])
-        : current.filter((id) => id !== productId);
+    const updated = await wooFetch(`customers/${customer.id}`, {
+      method: "PUT",
+      body: payload,
+    });
 
-    const wishlist = await saveWishlistForCustomer(customer, next);
     return res.status(200).json({
-      source: "store-wishlist",
-      wishlist,
+      source: "store-customer",
+      user: normalizeCustomer(updated),
+      message: "Profile updated successfully.",
     });
   } catch (e) {
-    return res.status(500).json({ error: e?.message || "Wishlist request failed." });
+    return res.status(500).json({ error: e?.message || "Customer request failed." });
   }
 }

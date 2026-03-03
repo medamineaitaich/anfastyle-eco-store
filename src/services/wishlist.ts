@@ -1,35 +1,38 @@
-import { apiUrl } from './api';
-import { getSession } from './authStorage';
+import { ApiError, apiFetch } from './http';
 
-function getAuthToken(): string {
-  const session = getSession();
-  return String(session?.token || '').trim();
+interface WishlistResponse {
+  wishlist?: unknown[];
 }
 
-async function requestWishlist(method: 'GET' | 'POST', body?: Record<string, unknown>): Promise<number[]> {
-  const token = getAuthToken();
-  if (!token) {
-    throw new Error('Please sign in to use wishlist.');
-  }
-
-  const res = await fetch(apiUrl('/api/store/wishlist'), {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(String(data?.error || 'Wishlist request failed.'));
-  }
-
-  const wishlist = Array.isArray(data?.wishlist) ? data.wishlist : [];
+function toWishlistIds(raw: unknown): number[] {
+  const wishlist = Array.isArray(raw) ? raw : [];
   return wishlist
     .map((id: unknown) => Number(id))
     .filter((id: number) => Number.isFinite(id) && id > 0);
+}
+
+function normalizeWishlistError(error: unknown): Error {
+  if (error instanceof ApiError && error.status === 401) {
+    return new Error('Session expired. Please sign in again.');
+  }
+  if (error instanceof Error) return error;
+  return new Error('Unable to update wishlist right now.');
+}
+
+async function requestWishlist(method: 'GET' | 'POST', body?: Record<string, unknown>): Promise<number[]> {
+  try {
+    const data = await apiFetch<WishlistResponse>(
+      '/api/store/wishlist',
+      {
+        method,
+        ...(body ? { body } : {}),
+      },
+      { auth: true },
+    );
+    return toWishlistIds(data?.wishlist);
+  } catch (error) {
+    throw normalizeWishlistError(error);
+  }
 }
 
 export function getWishlist(): Promise<number[]> {

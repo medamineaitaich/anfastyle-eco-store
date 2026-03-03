@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ProductCard } from '../components/ui/ProductCard';
 import { Product } from '../types';
-import { fetchStoreCategories, fetchStoreProducts } from '../services/api';
+import { fetchStoreCategories, fetchStoreProducts, mapStoreListItemToProduct } from '../services/api';
 
 interface CatalogProps {
   onSelectProduct: (product: Product) => void;
@@ -50,14 +50,7 @@ export const Catalog = ({ onSelectProduct, onToggleWishlist, isWishlisted }: Cat
         });
         setTotalPages(Number(data.totalPages || 0));
 
-        const mapped: Product[] = (data.items || []).map((p: any) => ({
-          id: String(p.id),
-          name: String(p.name ?? p.title ?? ''),
-          price: Number((p.on_sale ? p.sale_price : (p.price ?? p.regular_price)) ?? 0),
-          image: String(p.image?.src ?? p.images?.[0]?.src ?? 'https://picsum.photos/seed/placeholder/600/800'),
-          category: String(p.categories?.[0]?.name ?? 'Uncategorized'),
-          description: '',
-        }));
+        const mapped: Product[] = (data.items || []).map((p: any) => mapStoreListItemToProduct(p));
 
         setProducts(mapped);
       } catch (err) {
