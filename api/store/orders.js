@@ -371,7 +371,7 @@ export default async function handler(req, res) {
       method: "POST",
       body: {
         reason,
-        amount: Number(requestedAmount.toFixed(2)),
+        amount: requestedAmount.toFixed(2),
         api_refund: true,
       },
     });
