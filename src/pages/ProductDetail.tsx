@@ -5,8 +5,8 @@ import { Product } from '../types';
 import { fetchStoreProduct, fetchStoreProducts, mapStoreListItemToProduct } from '../services/api';
 import { ProductCard } from '../components/ui/ProductCard';
 import { Newsletter } from '../components/ui/Newsletter';
-import { colorToCss } from '../utils/color';
 import { sanitizeHtml, splitDescriptionBlocks, toPlainText } from '../utils/html';
+import { isProbablyColorAttribute, resolveColorToHex } from '../utils/resolveColorToHex';
 
 interface ProductDetailProps {
   product?: Product;
@@ -21,7 +21,6 @@ interface GalleryImage {
   alt: string;
 }
 
-const COLOR_ATTR_KEYS = ['color', 'colors', 'colour', 'colours', 'pa_color', 'pa_colour', 'attribute_pa_color', 'attribute_pa_colour'];
 const SIZE_ATTR_KEYS = ['size', 'sizes', 'pa_size', 'attribute_pa_size'];
 
 function normalize(value: string): string {
@@ -42,8 +41,7 @@ function getAttributeKey(attribute: any): string {
 }
 
 function isColorAttribute(attribute: any): boolean {
-  const key = getAttributeKey(attribute);
-  return COLOR_ATTR_KEYS.some((candidate) => key.includes(candidate));
+  return isProbablyColorAttribute(getAttributeKey(attribute));
 }
 
 function isSizeAttribute(attribute: any): boolean {
@@ -499,31 +497,51 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
                 {availableColors.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-bold uppercase tracking-widest text-primary/50">Color</p>
-                    <div className="flex flex-wrap gap-2">
-                      {availableColors.map((colorOption) => {
+                    <div className="flex flex-wrap gap-3">
+                      {availableColors.map((colorOption, index) => {
                         const selected = normalize(selectedColor) === normalize(colorOption);
                         const isDisabled = !canChooseColor(colorOption);
-                        const swatchColor = colorToCss(colorOption);
+                        const swatchHex = resolveColorToHex(colorOption);
+
+                        if (!swatchHex) {
+                          return (
+                            <button
+                              key={`${colorOption}-${index}`}
+                              type="button"
+                              disabled={isDisabled}
+                              onClick={() => {
+                                setSelectedColor(colorOption);
+                                setSelectionError('');
+                              }}
+                              className={`px-4 py-2 rounded-xl border text-sm font-bold uppercase tracking-wide transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'border-primary bg-primary text-cream' : 'border-primary/20 bg-white hover:border-primary/50'}`}
+                              aria-label={`Color: ${String(colorOption || '').toUpperCase()}`}
+                              title={colorOption}
+                            >
+                              {colorOption}
+                            </button>
+                          );
+                        }
+
                         return (
-                          <button
-                            key={colorOption}
-                            type="button"
-                            disabled={isDisabled}
-                            onClick={() => {
-                              setSelectedColor(colorOption);
-                              setSelectionError('');
-                            }}
-                            className={`relative min-w-10 h-10 px-3 rounded-xl border text-xs font-bold uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'border-primary ring-2 ring-primary/20' : 'border-primary/20 hover:border-primary/50'}`}
-                            style={swatchColor ? { backgroundColor: swatchColor, color: '#ffffff' } : undefined}
-                            aria-label={`Select color ${colorOption}`}
-                            title={colorOption}
-                          >
-                            {swatchColor ? (
+                          <div key={`${colorOption}-${index}`} className="w-16 flex flex-col items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={isDisabled}
+                              onClick={() => {
+                                setSelectedColor(colorOption);
+                                setSelectionError('');
+                              }}
+                              className={`w-10 h-10 rounded-full border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'border-primary ring-2 ring-primary/40 ring-offset-2 shadow-md' : 'border-primary/20 hover:border-primary/50'}`}
+                              style={{ backgroundColor: swatchHex }}
+                              aria-label={`Color: ${String(colorOption || '').toUpperCase()}`}
+                              title={colorOption}
+                            >
                               <span className="sr-only">{colorOption}</span>
-                            ) : (
-                              <span>{colorOption}</span>
-                            )}
-                          </button>
+                            </button>
+                            <span className="text-[11px] text-primary/70 text-center leading-tight break-words">
+                              {colorOption}
+                            </span>
+                          </div>
                         );
                       })}
                     </div>
@@ -567,21 +585,42 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
             {!isVariableProduct && Array.isArray(product?.colors) && product.colors.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-bold uppercase tracking-widest text-primary/50">Color</p>
-                <div className="flex flex-wrap gap-2">
-                  {product.colors.map((colorOption: string) => {
+                <div className="flex flex-wrap gap-3">
+                  {product.colors.map((colorOption: string, index: number) => {
                     const selected = normalize(selectedColor) === normalize(colorOption);
-                    const swatchColor = colorToCss(colorOption);
+                    const swatchHex = resolveColorToHex(colorOption);
+
+                    if (!swatchHex) {
+                      return (
+                        <button
+                          key={`${colorOption}-${index}`}
+                          type="button"
+                          onClick={() => setSelectedColor(colorOption)}
+                          className={`px-4 py-2 rounded-xl border text-sm font-bold uppercase tracking-wide transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 ${selected ? 'border-primary bg-primary text-cream' : 'border-primary/20 bg-white hover:border-primary/50'}`}
+                          title={colorOption}
+                          aria-label={`Color: ${String(colorOption || '').toUpperCase()}`}
+                        >
+                          {colorOption}
+                        </button>
+                      );
+                    }
+
                     return (
-                      <button
-                        key={colorOption}
-                        type="button"
-                        onClick={() => setSelectedColor(colorOption)}
-                        className={`min-w-10 h-10 px-3 rounded-xl border transition-all ${selected ? 'border-primary ring-2 ring-primary/20' : 'border-primary/20 hover:border-primary/50'}`}
-                        style={swatchColor ? { backgroundColor: swatchColor } : undefined}
-                        title={colorOption}
-                      >
-                        {swatchColor ? <span className="sr-only">{colorOption}</span> : colorOption}
-                      </button>
+                      <div key={`${colorOption}-${index}`} className="w-16 flex flex-col items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedColor(colorOption)}
+                          className={`w-10 h-10 rounded-full border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 ${selected ? 'border-primary ring-2 ring-primary/40 ring-offset-2 shadow-md' : 'border-primary/20 hover:border-primary/50'}`}
+                          style={{ backgroundColor: swatchHex }}
+                          title={colorOption}
+                          aria-label={`Color: ${String(colorOption || '').toUpperCase()}`}
+                        >
+                          <span className="sr-only">{colorOption}</span>
+                        </button>
+                        <span className="text-[11px] text-primary/70 text-center leading-tight break-words">
+                          {colorOption}
+                        </span>
+                      </div>
                     );
                   })}
                 </div>

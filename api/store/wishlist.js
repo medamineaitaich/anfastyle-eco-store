@@ -100,26 +100,65 @@ async function validateTokenRequest(authUrl, token) {
     res.ok &&
     (data?.success === true || data?.data?.success === true || data?.data?.is_valid === true || data?.is_valid === true);
 
-  return { valid: Boolean(success), data, status: res.status };
+  const code = String(data?.code || data?.data?.code || "").toLowerCase();
+  const message = String(data?.message || data?.data?.message || "").toLowerCase();
+  const noRoute = res.status === 404 || code === "rest_no_route" || message.includes("no route was found");
+  const invalidToken =
+    !noRoute &&
+    (res.status === 401 ||
+      res.status === 403 ||
+      code.includes("jwt") ||
+      message.includes("invalid") ||
+      message.includes("expired") ||
+      message.includes("unauthorized"));
+
+  return {
+    valid: Boolean(success),
+    invalidToken: Boolean(invalidToken),
+    unavailable: Boolean(noRoute || res.status >= 500),
+    data,
+    status: res.status,
+  };
+}
+
+function isJwtExpired(token) {
+  const payload = decodeJwtPayloadSafely(token);
+  const exp = Number(payload?.exp);
+  if (!Number.isFinite(exp) || exp <= 0) return false;
+  return Math.floor(Date.now() / 1000) >= exp;
 }
 
 async function validateToken(base, token) {
+  if (isJwtExpired(token)) {
+    return { state: "invalid", data: {}, status: 401 };
+  }
+
   const endpoints = [
     `${base}/?rest_route=/simple-jwt-login/v1/auth/validate`,
     `${base}/wp-json/simple-jwt-login/v1/auth/validate`,
   ];
 
-  let last = { valid: false, data: {}, status: 0 };
+  let sawUnavailable = false;
+  let lastData = {};
+  let lastStatus = 0;
   for (const endpoint of endpoints) {
     try {
-      last = await validateTokenRequest(endpoint, token);
-      if (last.valid) return last;
+      const result = await validateTokenRequest(endpoint, token);
+      lastData = result.data || lastData;
+      lastStatus = result.status || lastStatus;
+      if (result.valid) return { state: "valid", data: result.data, status: result.status };
+      if (result.invalidToken) return { state: "invalid", data: result.data, status: result.status };
+      if (result.unavailable) sawUnavailable = true;
     } catch {
-      // Try next endpoint.
+      sawUnavailable = true;
     }
   }
 
-  return last;
+  if (sawUnavailable) {
+    return { state: "unverified", data: lastData, status: lastStatus };
+  }
+
+  return { state: "unverified", data: lastData, status: lastStatus };
 }
 
 async function findCustomerByEmail(email) {
@@ -222,7 +261,7 @@ export default async function handler(req, res) {
 
     const base = getWpBaseUrl();
     const tokenValidation = await validateToken(base, token);
-    if (!tokenValidation.valid) {
+    if (tokenValidation.state === "invalid") {
       return res.status(401).json({ error: "Your session has expired. Please sign in again." });
     }
 

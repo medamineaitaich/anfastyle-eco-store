@@ -6,9 +6,10 @@ import { COUNTRY_OPTIONS, getStateOptions } from '../utils/location';
 
 interface RegisterProps {
   onLogin: (user: User) => void;
+  externalMessage?: string;
 }
 
-export const Register = ({ onLogin }: RegisterProps) => {
+export const Register = ({ onLogin, externalMessage = '' }: RegisterProps) => {
   const [isSignIn, setIsSignIn] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -123,10 +124,10 @@ export const Register = ({ onLogin }: RegisterProps) => {
           <h1 className="text-4xl font-serif mb-2">{isSignIn ? 'Welcome Back' : 'Create Account'}</h1>
           <p className="text-primary/60 mb-8">{isSignIn ? 'Sign in to your account' : 'Create your account with email and password'}</p>
 
-          {message.text && (
+          {(externalMessage || message.text) && (
             <div className={`mb-8 p-4 rounded-xl flex items-center gap-3 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-              {message.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-              <span className="text-sm font-medium">{message.text}</span>
+              {message.type === 'success' && !externalMessage ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+              <span className="text-sm font-medium">{externalMessage || message.text}</span>
             </div>
           )}
 

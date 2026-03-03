@@ -90,6 +90,8 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [authToken, setAuthToken] = useState('');
+  const [isAuthHydrating, setIsAuthHydrating] = useState(true);
+  const [authNotice, setAuthNotice] = useState('');
 
   const { cart, isCartOpen, setIsCartOpen, addToCart, updateQuantity, removeFromCart, clearCart, cartCount } = useCart();
   const { user, setUser, orders, addOrder } = useAuth();
@@ -106,6 +108,7 @@ export default function App() {
       if (!session) {
         setAuthToken('');
         setUser(null);
+        setIsAuthHydrating(false);
         return;
       }
 
@@ -117,18 +120,19 @@ export default function App() {
       setUser(cachedUser);
 
       try {
-        const freshProfile = await fetchCustomerProfile();
+        const freshProfile = await fetchCustomerProfile({ logoutOnUnauthorized: false });
         if (!mounted) return;
         const nextUser = { ...cachedUser, ...freshProfile, token: session.token };
         setUser(nextUser);
         setSession({ token: session.token, user: nextUser });
+        setAuthNotice('');
       } catch (error) {
         if (!mounted) return;
         if (error instanceof ApiError && error.status === 401) {
-          setAuthToken('');
-          setUser(null);
-          clearSession();
+          setAuthNotice('Signed in, but profile sync failed. Please refresh account details.');
         }
+      } finally {
+        if (mounted) setIsAuthHydrating(false);
       }
     };
 
@@ -141,7 +145,9 @@ export default function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleAuthExpired = () => {
+    const handleAuthExpired = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      setAuthNotice(detail?.message || 'Your session expired. Please sign in again.');
       setAuthToken('');
       setUser(null);
       clearSession();
@@ -198,27 +204,36 @@ export default function App() {
 
     if (!nextUser) {
       setAuthToken('');
+      setAuthNotice('');
       clearSession();
       return;
     }
 
     const token = String(nextUser.token || authToken || '');
+    if (!token) {
+      setAuthToken('');
+      setAuthNotice('Login failed: missing session token. Please sign in again.');
+      clearSession();
+      setUser(null);
+      return;
+    }
+
     const userWithToken = { ...nextUser, token };
     setAuthToken(token);
+    setAuthNotice('');
     setSession({ token, user: userWithToken });
 
     if (token) {
-      void fetchCustomerProfile()
+      void fetchCustomerProfile({ logoutOnUnauthorized: false })
         .then((freshProfile) => {
           const merged = { ...userWithToken, ...freshProfile, token };
           setUser(merged);
           setSession({ token, user: merged });
+          setAuthNotice('');
         })
         .catch((error) => {
           if (error instanceof ApiError && error.status === 401) {
-            setAuthToken('');
-            setUser(null);
-            clearSession();
+            setAuthNotice('Signed in, but profile sync failed. Please refresh account details.');
           }
         });
     }
@@ -303,7 +318,11 @@ export default function App() {
         <Route
           path="/account"
           element={
-            user ? (
+            isAuthHydrating && authToken ? (
+              <div className="py-20 bg-cream min-h-screen flex items-center justify-center">
+                <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+              </div>
+            ) : user ? (
               <UserProfile
                 user={user}
                 setUser={handleSetAuthUser}
@@ -316,7 +335,9 @@ export default function App() {
               />
             ) : (
               <Register
+                externalMessage={authNotice}
                 onLogin={(u: User) => {
+                  setAuthNotice('');
                   handleSetAuthUser(u);
                   handleSetActivePage('account');
                 }}
@@ -327,7 +348,11 @@ export default function App() {
         <Route
           path="/account/wishlist"
           element={
-            user ? (
+            isAuthHydrating && authToken ? (
+              <div className="py-20 bg-cream min-h-screen flex items-center justify-center">
+                <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+              </div>
+            ) : user ? (
               <WishlistPage
                 wishlist={wishlist}
                 onSelectProduct={handleSelectProduct}
@@ -338,7 +363,9 @@ export default function App() {
               />
             ) : (
               <Register
+                externalMessage={authNotice}
                 onLogin={(u: User) => {
+                  setAuthNotice('');
                   handleSetAuthUser(u);
                   navigate('/account/wishlist');
                 }}

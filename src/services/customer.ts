@@ -43,8 +43,12 @@ function mapProfileToUser(profile: CustomerProfileResponse['user']): User {
   };
 }
 
-export async function fetchCustomerProfile(): Promise<User> {
-  const data = await apiFetch<CustomerProfileResponse>('/api/store/customer', { method: 'GET' }, { auth: true });
+export async function fetchCustomerProfile(options: { logoutOnUnauthorized?: boolean } = {}): Promise<User> {
+  const data = await apiFetch<CustomerProfileResponse>(
+    '/api/store/customer',
+    { method: 'GET' },
+    { auth: true, logoutOnUnauthorized: options.logoutOnUnauthorized },
+  );
   return mapProfileToUser(data.user || {});
 }
 

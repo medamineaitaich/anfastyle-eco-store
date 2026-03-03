@@ -39,11 +39,12 @@ function parseResponseBody(text: string) {
 export async function apiFetch<T>(
   path: string,
   options: Omit<RequestInit, 'body'> & { body?: unknown } = {},
-  config: { auth?: boolean } = {},
+  config: { auth?: boolean; logoutOnUnauthorized?: boolean } = {},
 ): Promise<T> {
   const token = getAuthToken();
   const headers = new Headers(options.headers || {});
   const wantsAuth = Boolean(config.auth);
+  const logoutOnUnauthorized = config.logoutOnUnauthorized !== false;
 
   if (wantsAuth) {
     if (!token) {
@@ -77,7 +78,7 @@ export async function apiFetch<T>(
           ? data
           : 'Request failed.';
 
-    if (wantsAuth && res.status === 401) {
+    if (wantsAuth && res.status === 401 && logoutOnUnauthorized) {
       clearSession();
       notifyAuthExpired('Your session expired. Please sign in again.');
     }
