@@ -94,7 +94,7 @@ export default function App() {
   const [authNotice, setAuthNotice] = useState('');
 
   const { cart, isCartOpen, setIsCartOpen, addToCart, updateQuantity, removeFromCart, clearCart, cartCount } = useCart();
-  const { user, setUser, orders, addOrder } = useAuth();
+  const { user, setUser, addOrder } = useAuth();
   const { wishlist, isWishlisted, removeFromWishlist, toggleWishlist } = useWishlist(products, authToken);
 
   useEffect(() => {
@@ -326,7 +326,6 @@ export default function App() {
               <UserProfile
                 user={user}
                 setUser={handleSetAuthUser}
-                orders={orders}
                 wishlist={wishlist}
                 removeFromWishlist={(productId) => {
                   removeFromWishlist(productId).catch(() => undefined);

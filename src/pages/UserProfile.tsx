@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { User as UserIcon, Package, Heart, Settings, LogOut, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Order, Product } from '../types';
+import { User, Product } from '../types';
 import { fetchCustomerProfile, updateCustomerProfile } from '../services/customer';
+import { AccountOrder, fetchCustomerOrders, requestOrderRefund } from '../services/orders';
 import { COUNTRY_OPTIONS, getStateOptions } from '../utils/location';
 
 interface UserProfileProps {
   user: User;
   setUser: (user: User | null) => void;
-  orders: Order[];
   wishlist: Product[];
   removeFromWishlist: (productId: string) => void;
   setActivePage: (page: string) => void;
@@ -51,12 +51,17 @@ function getErrorMessage(error: unknown): string {
   return 'Unable to save profile right now. Please try again.';
 }
 
-export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlist, setActivePage }: UserProfileProps) => {
+export const UserProfile = ({ user, setUser, wishlist, removeFromWishlist, setActivePage }: UserProfileProps) => {
   const [activeTab, setActiveTab] = useState('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<ProfileFormData>(() => getInitialFormData(user));
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [accountOrders, setAccountOrders] = useState<AccountOrder[]>([]);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState('');
+  const [ordersNotice, setOrdersNotice] = useState('');
+  const [refundLoadingOrderId, setRefundLoadingOrderId] = useState('');
 
   const stateOptions = useMemo(() => getStateOptions(formData.country), [formData.country]);
   const hasStateOptions = stateOptions.length > 0;
@@ -65,6 +70,32 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
     if (isEditing) return;
     setFormData(getInitialFormData(user));
   }, [isEditing, user]);
+
+  useEffect(() => {
+    if (activeTab !== 'orders') return;
+
+    let mounted = true;
+    setIsOrdersLoading(true);
+    setOrdersError('');
+
+    fetchCustomerOrders()
+      .then((orders) => {
+        if (!mounted) return;
+        setAccountOrders(orders);
+      })
+      .catch((error) => {
+        if (!mounted) return;
+        const text = error instanceof Error ? error.message : 'Unable to load orders right now.';
+        setOrdersError(text);
+      })
+      .finally(() => {
+        if (mounted) setIsOrdersLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [activeTab]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +158,32 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
   const handleLogout = () => {
     setUser(null);
     setActivePage('home');
+  };
+
+  const handleRequestRefund = async (order: AccountOrder) => {
+    if (!order?.canRefund || refundLoadingOrderId) return;
+
+    const reason = typeof window !== 'undefined'
+      ? window.prompt('Refund reason (optional):', 'Customer requested a refund')
+      : 'Customer requested a refund';
+
+    setRefundLoadingOrderId(String(order.id));
+    setOrdersError('');
+    setOrdersNotice('');
+    try {
+      const result = await requestOrderRefund({
+        orderId: order.id,
+        reason: reason || undefined,
+      });
+      const refreshed = await fetchCustomerOrders();
+      setAccountOrders(refreshed);
+      setOrdersNotice(result.message || 'Refund submitted successfully.');
+    } catch (error) {
+      const text = error instanceof Error ? error.message : 'Unable to create refund request.';
+      setOrdersError(text);
+    } finally {
+      setRefundLoadingOrderId('');
+    }
   };
 
   return (
@@ -374,7 +431,18 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                   className="space-y-6"
                 >
                   <h2 className="text-3xl font-serif mb-8">Order History</h2>
-                  {orders.length === 0 ? (
+                  {ordersError && (
+                    <div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm font-medium">{ordersError}</div>
+                  )}
+                  {ordersNotice && (
+                    <div className="bg-green-50 text-green-700 p-4 rounded-xl text-sm font-medium">{ordersNotice}</div>
+                  )}
+
+                  {isOrdersLoading ? (
+                    <div className="bg-white p-20 rounded-3xl shadow-sm text-center">
+                      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto" />
+                    </div>
+                  ) : accountOrders.length === 0 ? (
                     <div className="bg-white p-20 rounded-3xl shadow-sm text-center">
                       <Package size={48} className="mx-auto mb-6 text-primary/10" />
                       <p className="text-primary/40 mb-8">You haven't placed any orders yet.</p>
@@ -386,7 +454,7 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                       </button>
                     </div>
                   ) : (
-                    orders.map((order: any) => (
+                    accountOrders.map((order) => (
                       <div key={order.id} className="bg-white p-8 rounded-3xl shadow-sm border border-primary/5">
                         <div className="flex flex-wrap justify-between items-start gap-4 mb-6 pb-6 border-b border-primary/5">
                           <div>
@@ -395,7 +463,7 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                           </div>
                           <div>
                             <p className="text-xs font-bold uppercase tracking-widest text-primary/40 mb-1">Date</p>
-                            <p className="font-medium">{order.date}</p>
+                            <p className="font-medium">{order.date ? new Date(order.date).toLocaleDateString() : '-'}</p>
                           </div>
                           <div>
                             <p className="text-xs font-bold uppercase tracking-widest text-primary/40 mb-1">Status</p>
@@ -405,20 +473,26 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                           </div>
                           <div>
                             <p className="text-xs font-bold uppercase tracking-widest text-primary/40 mb-1">Tracking</p>
-                            <p className="font-mono text-secondary text-sm">{order.trackingNumber}</p>
+                            <p className="font-mono text-secondary text-sm">{order.trackingNumber || '-'}</p>
                           </div>
                         </div>
                         <div className="space-y-4">
-                          {order.items.map((item: any, idx: number) => (
+                          {order.items.map((item, idx) => (
                             <div key={idx} className="flex gap-4 items-center">
                               <div className="w-12 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                {item.image ? (
+                                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full bg-cream/40" />
+                                )}
                               </div>
                               <div className="flex-grow">
                                 <h4 className="text-sm font-medium">{item.name}</h4>
-                                <p className="text-[10px] text-primary/40 uppercase tracking-widest">{item.size} / {item.color}</p>
+                                <p className="text-[10px] text-primary/40 uppercase tracking-widest">
+                                  {(item.size || '-') + ' / ' + (item.color || '-')} · Qty {item.quantity}
+                                </p>
                               </div>
-                              <p className="text-sm font-bold">${item.price.toFixed(2)}</p>
+                              <p className="text-sm font-bold">${item.total.toFixed(2)}</p>
                             </div>
                           ))}
                         </div>
@@ -426,6 +500,17 @@ export const UserProfile = ({ user, setUser, orders, wishlist, removeFromWishlis
                           <p className="text-sm text-primary/60">Total Amount</p>
                           <p className="text-xl font-serif font-bold">${order.total.toFixed(2)}</p>
                         </div>
+                        {order.canRefund && (
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              onClick={() => handleRequestRefund(order)}
+                              disabled={refundLoadingOrderId === String(order.id)}
+                              className="bg-primary text-cream px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-accent transition-all disabled:opacity-50"
+                            >
+                              {refundLoadingOrderId === String(order.id) ? 'Requesting...' : 'Request Refund'}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))
                   )}
