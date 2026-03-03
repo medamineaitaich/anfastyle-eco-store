@@ -7,10 +7,12 @@ import { Product } from '../types';
 interface HomeProps {
   setActivePage: (page: string) => void;
   onSelectProduct: (product: Product) => void;
+  onToggleWishlist: (product: Product) => void;
+  isWishlisted: (productId: string | number) => boolean;
   products: Product[];
 }
 
-export const Home = ({ setActivePage, onSelectProduct, products }: HomeProps) => {
+export const Home = ({ setActivePage, onSelectProduct, onToggleWishlist, isWishlisted, products }: HomeProps) => {
   const featuredProducts = products.slice(0, 4);
 
   return (
@@ -93,7 +95,13 @@ export const Home = ({ setActivePage, onSelectProduct, products }: HomeProps) =>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {featuredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} onSelect={onSelectProduct} />
+              <ProductCard
+                key={product.id}
+                product={product}
+                onSelect={onSelectProduct}
+                onToggleWishlist={onToggleWishlist}
+                isWishlisted={isWishlisted(product.id)}
+              />
             ))}
           </div>
 

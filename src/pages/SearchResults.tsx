@@ -6,9 +6,11 @@ import { Product } from '../types';
 interface SearchResultsProps {
   results: Product[];
   onSelectProduct: (product: Product) => void;
+  onToggleWishlist: (product: Product) => void;
+  isWishlisted: (productId: string | number) => boolean;
 }
 
-export const SearchResults = ({ results, onSelectProduct }: SearchResultsProps) => (
+export const SearchResults = ({ results, onSelectProduct, onToggleWishlist, isWishlisted }: SearchResultsProps) => (
   <div className="py-20 bg-cream min-h-screen">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <h1 className="text-4xl font-serif mb-12">Search Results ({results.length})</h1>
@@ -20,7 +22,13 @@ export const SearchResults = ({ results, onSelectProduct }: SearchResultsProps) 
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {results.map((product) => (
-            <ProductCard key={product.id} product={product} onSelect={() => onSelectProduct(product)} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              onSelect={() => onSelectProduct(product)}
+              onToggleWishlist={onToggleWishlist}
+              isWishlisted={isWishlisted(product.id)}
+            />
           ))}
         </div>
       )}

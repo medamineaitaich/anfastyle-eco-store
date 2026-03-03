@@ -8,10 +8,11 @@ interface ProductDetailProps {
   product?: Product;
   onBack: () => void;
   onAddToCart: (p: Product, color: string, size: string) => void;
-  onAddToWishlist: (p: Product) => void;
+  onToggleWishlist: (p: Product) => Promise<boolean>;
+  isWishlisted: (productId: string | number) => boolean;
 }
 
-export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, onAddToWishlist }: ProductDetailProps) => {
+export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, onToggleWishlist, isWishlisted }: ProductDetailProps) => {
   const { id, productId } = useParams<{ id?: string; productId?: string }>();
   const productIdFromRoute = id ?? productId ?? initialProduct?.id;
   const [product, setProduct] = useState<any>(null);
@@ -321,14 +322,19 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
                   Add to Cart
                 </button>
                 <button 
-                  onClick={() => {
-                    onAddToWishlist(cartProduct);
-                    setWishlistMessage('Added to wishlist!');
-                    setTimeout(() => setWishlistMessage(''), 2000);
+                  onClick={async () => {
+                    try {
+                      const added = await onToggleWishlist(cartProduct);
+                      setWishlistMessage(added ? 'Added to wishlist!' : 'Removed from wishlist!');
+                    } catch (e: any) {
+                      setWishlistMessage(e?.message || 'Unable to update wishlist.');
+                    } finally {
+                      setTimeout(() => setWishlistMessage(''), 2000);
+                    }
                   }}
                   className="px-6 bg-white text-primary border border-primary/10 rounded-2xl hover:bg-cream transition-all relative"
                 >
-                  <Heart size={24} className={wishlistMessage ? 'fill-secondary text-secondary' : ''} />
+                  <Heart size={24} className={isWishlisted(cartProduct.id) ? 'fill-secondary text-secondary' : ''} />
                   {wishlistMessage && (
                     <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-primary text-cream text-[10px] px-2 py-1 rounded whitespace-nowrap">
                       {wishlistMessage}

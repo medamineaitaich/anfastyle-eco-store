@@ -5,9 +5,11 @@ import { fetchStoreCategories, fetchStoreProducts } from '../services/api';
 
 interface CatalogProps {
   onSelectProduct: (product: Product) => void;
+  onToggleWishlist: (product: Product) => void;
+  isWishlisted: (productId: string | number) => boolean;
 }
 
-export const Catalog = ({ onSelectProduct }: CatalogProps) => {
+export const Catalog = ({ onSelectProduct, onToggleWishlist, isWishlisted }: CatalogProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Array<{ id: number; name: string; slug: string; count: number; parent: number }>>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
@@ -147,7 +149,13 @@ export const Catalog = ({ onSelectProduct }: CatalogProps) => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12">
             {products.map((product) => (
-              <ProductCard key={product.id} product={product} onSelect={onSelectProduct} />
+              <ProductCard
+                key={product.id}
+                product={product}
+                onSelect={onSelectProduct}
+                onToggleWishlist={onToggleWishlist}
+                isWishlisted={isWishlisted(product.id)}
+              />
             ))}
           </div>
         )}

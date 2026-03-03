@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { Home } from './pages/Home';
@@ -11,6 +11,7 @@ import { Contact } from './pages/Contact';
 import { Register } from './pages/Register';
 import { ResetPassword } from './pages/ResetPassword';
 import { UserProfile } from './pages/UserProfile';
+import { WishlistPage } from './pages/Wishlist';
 import { SearchResults } from './pages/SearchResults';
 import { FAQs, PrivacyPolicy, TermsOfService, Disclaimer } from './pages/Legal';
 import { SearchOverlay } from './components/common/SearchOverlay';
@@ -90,15 +91,7 @@ export default function App() {
 
   const { cart, isCartOpen, setIsCartOpen, addToCart, updateQuantity, removeFromCart, clearCart, cartCount } = useCart();
   const { user, setUser, orders, addOrder } = useAuth();
-  const wishlistUserKey = useMemo(() => {
-    if (!user) return null;
-    if (user.id !== undefined && user.id !== null && String(user.id).trim()) {
-      return `id:${String(user.id).trim()}`;
-    }
-    if (user.email) return `email:${String(user.email).trim().toLowerCase()}`;
-    return null;
-  }, [user]);
-  const { wishlist, addToWishlist, removeFromWishlist } = useWishlist(wishlistUserKey);
+  const { wishlist, isWishlisted, removeFromWishlist, toggleWishlist } = useWishlist(products, authToken);
 
   useEffect(() => {
     setActivePage(getActivePageFromPath(location.pathname));
@@ -195,8 +188,32 @@ export default function App() {
 
     return (
       <Routes>
-        <Route path="/" element={<Home setActivePage={handleSetActivePage} onSelectProduct={handleSelectProduct} products={products} />} />
-        <Route path="/catalog" element={<Catalog onSelectProduct={handleSelectProduct} />} />
+        <Route
+          path="/"
+          element={
+            <Home
+              setActivePage={handleSetActivePage}
+              onSelectProduct={handleSelectProduct}
+              onToggleWishlist={(product) => {
+                toggleWishlist(product).catch(() => undefined);
+              }}
+              isWishlisted={isWishlisted}
+              products={products}
+            />
+          }
+        />
+        <Route
+          path="/catalog"
+          element={
+            <Catalog
+              onSelectProduct={handleSelectProduct}
+              onToggleWishlist={(product) => {
+                toggleWishlist(product).catch(() => undefined);
+              }}
+              isWishlisted={isWishlisted}
+            />
+          }
+        />
         <Route
           path="/product/:id"
           element={
@@ -204,7 +221,8 @@ export default function App() {
               product={selectedProduct || undefined}
               onBack={() => handleSetActivePage('catalog')}
               onAddToCart={addToCart}
-              onAddToWishlist={addToWishlist}
+              onToggleWishlist={toggleWishlist}
+              isWishlisted={isWishlisted}
             />
           }
         />
@@ -233,7 +251,9 @@ export default function App() {
                 setUser={handleSetAuthUser}
                 orders={orders}
                 wishlist={wishlist}
-                removeFromWishlist={removeFromWishlist}
+                removeFromWishlist={(productId) => {
+                  removeFromWishlist(productId).catch(() => undefined);
+                }}
                 setActivePage={handleSetActivePage}
               />
             ) : (
@@ -246,8 +266,42 @@ export default function App() {
             )
           }
         />
+        <Route
+          path="/account/wishlist"
+          element={
+            user ? (
+              <WishlistPage
+                wishlist={wishlist}
+                onSelectProduct={handleSelectProduct}
+                onToggleWishlist={(product) => {
+                  toggleWishlist(product).catch(() => undefined);
+                }}
+                isWishlisted={isWishlisted}
+              />
+            ) : (
+              <Register
+                onLogin={(u: User) => {
+                  handleSetAuthUser(u);
+                  navigate('/account/wishlist');
+                }}
+              />
+            )
+          }
+        />
         <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/search-results" element={<SearchResults results={searchResults} onSelectProduct={handleSelectProduct} />} />
+        <Route
+          path="/search-results"
+          element={
+            <SearchResults
+              results={searchResults}
+              onSelectProduct={handleSelectProduct}
+              onToggleWishlist={(product) => {
+                toggleWishlist(product).catch(() => undefined);
+              }}
+              isWishlisted={isWishlisted}
+            />
+          }
+        />
         <Route path="/faqs" element={<FAQs />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
