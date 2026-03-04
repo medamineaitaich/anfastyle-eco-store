@@ -403,32 +403,36 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
   ]);
 
   if (loading) {
-    return <div className="py-20 bg-cream min-h-screen">Loading...</div>;
+    return <div className="py-32 bg-cream min-h-screen grid items-center justify-center text-primary/60 tracking-widest uppercase text-sm font-bold animate-pulse">Loading Product...</div>;
   }
 
   if (error) {
-    return <div className="py-20 bg-cream min-h-screen">{error}</div>;
+    return <div className="py-32 bg-cream min-h-screen grid items-center justify-center text-red-700 tracking-widest uppercase text-sm font-bold">{error}</div>;
   }
 
   if (!product) {
-    return <div className="py-20 bg-cream min-h-screen">Product not found.</div>;
+    return <div className="py-32 bg-cream min-h-screen grid items-center justify-center text-primary/60 tracking-widest uppercase text-sm font-bold">Product not found.</div>;
   }
 
   const currentImage = galleryImages[activeImageIndex];
 
   return (
-    <div className="py-20 bg-cream min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="bg-[#FAF9F6] min-h-screen pb-32">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12 pt-8 lg:pt-16">
+
+        {/* Breadcrumb Navigation */}
         <button
           onClick={onBack}
-          className="flex items-center text-sm font-bold uppercase tracking-widest text-primary/50 hover:text-primary mb-12 transition-colors"
+          className="group flex items-center text-xs font-bold uppercase tracking-[0.2em] text-primary/40 hover:text-primary mb-10 transition-all duration-300"
         >
-          <ChevronRight size={18} className="rotate-180 mr-2" />
-          Back to Catalog
+          <ChevronRight size={14} className="rotate-180 mr-3 transition-transform group-hover:-translate-x-1" />
+          Back to Collection
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
-          <div className="space-y-4">
+        <div className="flex flex-col lg:flex-row gap-12 xl:gap-24 relative items-start">
+
+          {/* Left Column: Sticky Image Gallery */}
+          <div className="w-full lg:w-[55%] lg:sticky lg:top-32 space-y-6">
             <button
               ref={mainImageButtonRef}
               type="button"
@@ -436,25 +440,29 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
                 setLightboxIndex(activeImageIndex);
                 setIsLightboxOpen(true);
               }}
-              className="w-full aspect-[3/4] overflow-hidden rounded-3xl bg-white shadow-xl focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full aspect-[4/5] overflow-hidden rounded-[2.5rem] bg-stone-100 shadow-2xl shadow-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/20 relative group"
               aria-label="Open image gallery"
             >
               <img
                 src={currentImage?.src}
                 alt={currentImage?.alt || product.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500 pointer-events-none" />
             </button>
 
             {galleryImages.length > 1 && (
-              <div className="grid grid-cols-5 gap-3">
+              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
                 {galleryImages.map((image, index) => (
                   <button
                     key={image.src}
                     type="button"
                     onClick={() => setActiveImageIndex(index)}
-                    className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${index === activeImageIndex ? 'border-primary shadow-md' : 'border-primary/10 hover:border-primary/40'}`}
+                    className={`relative shrink-0 w-24 aspect-[4/5] rounded-2xl overflow-hidden transition-all duration-300 snap-center
+                      ${index === activeImageIndex
+                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-[#FAF9F6]'
+                        : 'opacity-60 hover:opacity-100 mix-blend-multiply'}`}
                     aria-label={`View image ${index + 1}`}
                   >
                     <img src={image.src} alt={image.alt || product.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -464,84 +472,80 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
             )}
           </div>
 
-          <div className="space-y-8">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-secondary mb-2">{product.categories?.[0]?.name}</p>
-              <h1 className="text-4xl md:text-5xl font-serif mb-4">{product.name}</h1>
-              <p className="text-2xl text-primary mb-4">${formatPrice(displayPrice)}</p>
-              <div className="flex flex-wrap items-center gap-4 text-sm text-primary/70">
-                <span className={`font-medium ${effectiveStockStatus === 'instock' ? 'text-green-700' : 'text-red-600'}`}>
+          {/* Right Column: Scrolling Product Details */}
+          <div className="w-full lg:w-[45%] lg:py-6 flex flex-col min-h-full">
+
+            {/* Header Section */}
+            <div className="space-y-4 mb-10">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-secondary">
+                {product.categories?.[0]?.name || 'Eco Collection'}
+              </p>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif text-primary leading-[1.1] tracking-tight">
+                {product.name}
+              </h1>
+
+              <div className="flex items-center gap-6 pt-2">
+                <p className="text-3xl font-light text-primary">
+                  ${formatPrice(displayPrice)}
+                </p>
+                <div className="h-6 w-px bg-primary/10" />
+                <span className={`text-xs font-bold uppercase tracking-widest ${effectiveStockStatus === 'instock' ? 'text-secondary/80' : 'text-red-800/80'}`}>
                   {stockLabel(effectiveStockStatus)}
                 </span>
-                {toNumber(product?.average_rating) > 0 && (
-                  <span className="inline-flex items-center gap-1">
-                    <Star size={14} className="fill-amber-400 text-amber-400" />
-                    {toNumber(product?.average_rating).toFixed(1)}
-                    <span className="text-primary/50">({toNumber(product?.rating_count)})</span>
-                  </span>
-                )}
               </div>
             </div>
 
+            {/* Short Description */}
             {sanitizedShortDescription && (
               <div
-                className="text-primary/70 leading-relaxed"
+                className="prose prose-stone text-primary/70 leading-relaxed mb-12 prose-p:text-lg prose-p:font-light"
                 dangerouslySetInnerHTML={{ __html: sanitizedShortDescription }}
               />
             )}
 
+            <div className="h-px w-full bg-primary/10 mb-12" />
+
+            {/* Variations / Options */}
             {isVariableProduct && (
-              <div className="space-y-5 rounded-2xl border border-primary/10 bg-white p-6">
-                <p className="text-sm font-bold uppercase tracking-widest text-primary/60">Choose options</p>
+              <div className="space-y-10 mb-12">
 
                 {availableColors.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-widest text-primary/50">Color</p>
-                    <div className="flex flex-wrap gap-3">
+                  <div className="space-y-4">
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/80">Select Color</p>
+                      <p className="text-[11px] uppercase tracking-widest text-primary/40 font-medium">{selectedColor || 'None selected'}</p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-4">
                       {availableColors.map((colorOption, index) => {
                         const selected = normalize(selectedColor) === normalize(colorOption);
                         const isDisabled = !canChooseColor(colorOption);
                         const swatchHex = resolveColorToHex(colorOption);
 
-                        if (!swatchHex) {
-                          return (
-                            <button
-                              key={`${colorOption}-${index}`}
-                              type="button"
-                              disabled={isDisabled}
-                              onClick={() => {
-                                setSelectedColor(colorOption);
-                                setSelectionError('');
-                              }}
-                              className={`px-4 py-2 rounded-xl border text-sm font-bold uppercase tracking-wide transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'border-primary bg-primary text-cream' : 'border-primary/20 bg-white hover:border-primary/50'}`}
-                              aria-label={`Color: ${String(colorOption || '').toUpperCase()}`}
-                              title={colorOption}
-                            >
-                              {colorOption}
-                            </button>
-                          );
-                        }
-
                         return (
-                          <div key={`${colorOption}-${index}`} className="w-16 flex flex-col items-center gap-1">
-                            <button
-                              type="button"
-                              disabled={isDisabled}
-                              onClick={() => {
-                                setSelectedColor(colorOption);
-                                setSelectionError('');
-                              }}
-                              className={`w-10 h-10 rounded-full border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'border-primary ring-2 ring-primary/40 ring-offset-2 shadow-md' : 'border-primary/20 hover:border-primary/50'}`}
-                              style={{ backgroundColor: swatchHex }}
-                              aria-label={`Color: ${String(colorOption || '').toUpperCase()}`}
-                              title={colorOption}
-                            >
-                              <span className="sr-only">{colorOption}</span>
-                            </button>
-                            <span className="text-[11px] text-primary/70 text-center leading-tight break-words">
-                              {colorOption}
-                            </span>
-                          </div>
+                          <button
+                            key={`${colorOption}-${index}`}
+                            type="button"
+                            disabled={isDisabled}
+                            onClick={() => {
+                              setSelectedColor(colorOption);
+                              setSelectionError('');
+                            }}
+                            className={`group relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-20
+                              ${selected ? 'ring-1 ring-primary ring-offset-4 ring-offset-[#FAF9F6]' : 'hover:scale-110'}`}
+                            title={colorOption}
+                          >
+                            {swatchHex ? (
+                              <span
+                                className="absolute inset-1 rounded-full border border-primary/5 shadow-inner"
+                                style={{ backgroundColor: swatchHex }}
+                              />
+                            ) : (
+                              <span className={`absolute inset-1 rounded-full border flex items-center justify-center text-[9px] uppercase tracking-tighter ${selected ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-white text-primary/80'}`}>
+                                {colorOption.slice(0, 3)}
+                              </span>
+                            )}
+                          </button>
                         );
                       })}
                     </div>
@@ -549,9 +553,13 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
                 )}
 
                 {availableSizes.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-widest text-primary/50">Size</p>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="space-y-4">
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/80">Select Size</p>
+                      <button className="text-[10px] uppercase tracking-widest text-primary/40 font-medium hover:text-secondary hover:underline underline-offset-4 transition-all">Size Guide</button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
                       {availableSizes.map((sizeOption) => {
                         const selected = normalize(selectedSize) === normalize(sizeOption);
                         const isDisabled = !canChooseSize(sizeOption);
@@ -564,8 +572,10 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
                               setSelectedSize(sizeOption);
                               setSelectionError('');
                             }}
-                            className={`px-4 py-2 rounded-xl border text-sm font-bold uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-40 ${selected ? 'border-primary bg-primary text-cream' : 'border-primary/20 bg-white hover:border-primary/50'}`}
-                            aria-label={`Select size ${sizeOption}`}
+                            className={`min-w-[3.5rem] px-5 py-3 rounded-2xl border text-sm font-medium uppercase tracking-widest transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-30
+                              ${selected
+                                ? 'border-primary bg-primary text-white shadow-xl shadow-primary/20'
+                                : 'border-primary/10 bg-white/50 hover:border-primary/30 text-primary/80 hover:bg-white hover:shadow-sm'}`}
                           >
                             {sizeOption}
                           </button>
@@ -575,52 +585,40 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
                   </div>
                 )}
 
-                {selectionError && <p className="text-sm text-red-600">{selectionError}</p>}
-                {selectionComplete && selectedVariation && !isVariationAvailable(selectedVariation) && (
-                  <p className="text-sm text-red-600">Selected variation is out of stock.</p>
-                )}
+                {/* Error Messages */}
+                <div className="min-h-[1.5rem] flex items-center">
+                  {selectionError && <p className="text-[11px] uppercase tracking-widest font-bold text-red-800">{selectionError}</p>}
+                  {selectionComplete && selectedVariation && !isVariationAvailable(selectedVariation) && (
+                    <p className="text-[11px] uppercase tracking-widest font-bold text-red-800">Variation out of stock</p>
+                  )}
+                </div>
               </div>
             )}
 
+            {/* Simple Product Fallback Swatches */}
             {!isVariableProduct && Array.isArray(product?.colors) && product.colors.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-primary/50">Color</p>
-                <div className="flex flex-wrap gap-3">
+              <div className="space-y-4 mb-10">
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/80">Available Colors</p>
+                <div className="flex flex-wrap gap-4">
                   {product.colors.map((colorOption: string, index: number) => {
                     const selected = normalize(selectedColor) === normalize(colorOption);
                     const swatchHex = resolveColorToHex(colorOption);
 
-                    if (!swatchHex) {
-                      return (
-                        <button
-                          key={`${colorOption}-${index}`}
-                          type="button"
-                          onClick={() => setSelectedColor(colorOption)}
-                          className={`px-4 py-2 rounded-xl border text-sm font-bold uppercase tracking-wide transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 ${selected ? 'border-primary bg-primary text-cream' : 'border-primary/20 bg-white hover:border-primary/50'}`}
-                          title={colorOption}
-                          aria-label={`Color: ${String(colorOption || '').toUpperCase()}`}
-                        >
-                          {colorOption}
-                        </button>
-                      );
-                    }
-
                     return (
-                      <div key={`${colorOption}-${index}`} className="w-16 flex flex-col items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedColor(colorOption)}
-                          className={`w-10 h-10 rounded-full border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 ${selected ? 'border-primary ring-2 ring-primary/40 ring-offset-2 shadow-md' : 'border-primary/20 hover:border-primary/50'}`}
-                          style={{ backgroundColor: swatchHex }}
-                          title={colorOption}
-                          aria-label={`Color: ${String(colorOption || '').toUpperCase()}`}
-                        >
-                          <span className="sr-only">{colorOption}</span>
-                        </button>
-                        <span className="text-[11px] text-primary/70 text-center leading-tight break-words">
-                          {colorOption}
-                        </span>
-                      </div>
+                      <button
+                        key={`${colorOption}-${index}`}
+                        type="button"
+                        onClick={() => setSelectedColor(colorOption)}
+                        className={`group relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 
+                            ${selected ? 'ring-1 ring-primary ring-offset-4 ring-offset-[#FAF9F6]' : 'hover:scale-110'}`}
+                        title={colorOption}
+                      >
+                        {swatchHex ? (
+                          <span className="absolute inset-1 rounded-full border border-primary/5 shadow-inner" style={{ backgroundColor: swatchHex }} />
+                        ) : (
+                          <span className={`absolute inset-1 rounded-full border flex items-center justify-center text-[9px] uppercase tracking-tighter ${selected ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-white text-primary/80'}`}>{colorOption.slice(0, 3)}</span>
+                        )}
+                      </button>
                     );
                   })}
                 </div>
@@ -628,9 +626,9 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
             )}
 
             {!isVariableProduct && Array.isArray(product?.sizes) && product.sizes.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-primary/50">Size</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="space-y-4 mb-10">
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary/80">Available Sizes</p>
+                <div className="flex flex-wrap gap-3">
                   {product.sizes.map((sizeOption: string) => {
                     const selected = normalize(selectedSize) === normalize(sizeOption);
                     return (
@@ -638,7 +636,8 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
                         key={sizeOption}
                         type="button"
                         onClick={() => setSelectedSize(sizeOption)}
-                        className={`px-4 py-2 rounded-xl border text-sm font-bold uppercase tracking-wide transition-all ${selected ? 'border-primary bg-primary text-cream' : 'border-primary/20 bg-white hover:border-primary/50'}`}
+                        className={`px-5 py-3 rounded-2xl border text-sm font-medium uppercase tracking-widest transition-all duration-300
+                           ${selected ? 'border-primary bg-primary text-white shadow-xl shadow-primary/20' : 'border-primary/10 bg-white/50 hover:border-primary/30 text-primary/80 hover:bg-white'}`}
                       >
                         {sizeOption}
                       </button>
@@ -648,121 +647,119 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
               </div>
             )}
 
-            <div className="pt-4 space-y-4">
-              <div className="flex gap-4">
-                <button
-                  onClick={() => {
-                    if (isSelectionMissing) {
-                      const missing: string[] = [];
-                      if (requiresColor && !selectedColor) missing.push('color');
-                      if (requiresSize && !selectedSize) missing.push('size');
-                      setSelectionError(`Please select ${missing.join(' and ')}.`);
-                      return;
-                    }
-                    if (addToCartDisabled) {
-                      setSelectionError('This product is currently unavailable.');
-                      return;
-                    }
-                    setSelectionError('');
-                    onAddToCart(cartProduct, selectedColor, selectedSize);
-                  }}
-                  disabled={addToCartDisabled}
-                  className="flex-grow bg-primary text-cream py-5 rounded-2xl font-bold uppercase tracking-widest hover:bg-accent transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Add to Cart
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const added = await onToggleWishlist(cartProduct);
-                      setWishlistMessage(added ? 'Added to wishlist.' : 'Removed from wishlist.');
-                    } catch (e: any) {
-                      setWishlistMessage(e?.message || 'Please sign in to use wishlist.');
-                    } finally {
-                      setTimeout(() => setWishlistMessage(''), 2400);
-                    }
-                  }}
-                  className="px-6 bg-white text-primary border border-primary/10 rounded-2xl hover:bg-cream transition-all relative"
-                >
-                  <Heart size={24} className={isWishlisted(cartProduct.id) ? 'fill-secondary text-secondary' : ''} />
-                  {wishlistMessage && (
-                    <span className="absolute -top-11 left-1/2 -translate-x-1/2 bg-primary text-cream text-[10px] px-2 py-1 rounded whitespace-nowrap">
-                      {wishlistMessage}
-                    </span>
-                  )}
-                </button>
-              </div>
-              <p className="text-center text-xs text-primary/40">
-                Free shipping on orders over $75. 30-day easy returns.
-              </p>
+            {/* Action Buttons */}
+            <div className="mt-4 flex gap-4">
+              <button
+                onClick={() => {
+                  if (isSelectionMissing) {
+                    const missing: string[] = [];
+                    if (requiresColor && !selectedColor) missing.push('color');
+                    if (requiresSize && !selectedSize) missing.push('size');
+                    setSelectionError(`Please select ${missing.join(' and ')}`);
+                    return;
+                  }
+                  if (addToCartDisabled) {
+                    setSelectionError('Currently unavailable');
+                    return;
+                  }
+                  setSelectionError('');
+                  onAddToCart(cartProduct, selectedColor, selectedSize);
+                }}
+                disabled={addToCartDisabled}
+                className="flex-grow bg-primary text-white py-[1.125rem] rounded-full text-xs font-bold uppercase tracking-[0.2em] hover:bg-black transition-all duration-500 shadow-2xl shadow-primary/20 disabled:opacity-40 disabled:hover:bg-primary disabled:shadow-none"
+              >
+                Add to Cart
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const added = await onToggleWishlist(cartProduct);
+                    setWishlistMessage(added ? 'Saved' : 'Removed');
+                  } catch (e: any) {
+                    setWishlistMessage(e?.message || 'Sign in required');
+                  } finally {
+                    setTimeout(() => setWishlistMessage(''), 2400);
+                  }
+                }}
+                className="w-14 h-[4.25rem] shrink-0 bg-white border border-primary/5 rounded-full flex items-center justify-center hover:bg-primary/5 hover:border-primary/20 transition-all duration-300 relative group"
+                aria-label="Toggle Wishlist"
+              >
+                <Heart
+                  size={20}
+                  strokeWidth={1.5}
+                  className={`transition-colors duration-300 ${isWishlisted(cartProduct.id) ? 'fill-[#A96B56] text-[#A96B56]' : 'text-primary/60 group-hover:text-primary'}`}
+                />
+
+                {wishlistMessage && (
+                  <span className="absolute -top-12 left-1/2 -translate-x-1/2 bg-primary/95 backdrop-blur-sm text-white text-[10px] font-medium tracking-wider uppercase px-4 py-2 rounded-lg whitespace-nowrap shadow-xl">
+                    {wishlistMessage}
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary/95 rotate-45" />
+                  </span>
+                )}
+              </button>
             </div>
+
+            <div className="mt-8 flex items-center justify-center gap-6 text-[10px] font-bold uppercase tracking-widest text-primary/40">
+              <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-secondary line-through opacity-80" /> Free Shipping</span>
+              <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-secondary line-through opacity-80" /> 30-Day Returns</span>
+              <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-secondary line-through opacity-80" /> Eco Packaging</span>
+            </div>
+
+            {/* Long Description Accordion logic visually separated */}
+            {(hasDescriptionQuery || isLongDescription || sanitizedDescription) && (
+              <div className="mt-16 pt-12 border-t border-primary/10">
+                <div className="relative">
+                  {!isDescriptionExpanded && isLongDescription && !hasDescriptionQuery && (
+                    <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#FAF9F6] via-[#FAF9F6]/90 to-transparent pointer-events-none z-10 flex items-end justify-center pb-4">
+                      <button
+                        type="button"
+                        onClick={() => setIsDescriptionExpanded(true)}
+                        className="pointer-events-auto bg-white/80 backdrop-blur border border-primary/10 px-6 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-primary/70 hover:text-primary hover:bg-white transition-all shadow-sm"
+                      >
+                        Read Full Details
+                      </button>
+                    </div>
+                  )}
+
+                  <div className={`prose prose-stone prose-h2:text-2xl prose-h2:font-serif prose-h2:font-normal prose-h2:mt-8 prose-p:text-primary/70 prose-p:leading-relaxed max-w-none ${!isDescriptionExpanded && isLongDescription && !hasDescriptionQuery ? 'max-h-[22rem] overflow-hidden' : ''}`}
+                    dangerouslySetInnerHTML={{ __html: sanitizedDescription || '<p>No description available.</p>' }}
+                  />
+
+                  {isDescriptionExpanded && isLongDescription && !hasDescriptionQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setIsDescriptionExpanded(false)}
+                      className="mt-8 text-[10px] font-bold uppercase tracking-[0.2em] text-primary/50 hover:text-primary transition-colors flex items-center gap-2"
+                    >
+                      <ChevronRight size={14} className="-rotate-90" />
+                      Show Less
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
 
-        <section className="mt-16 bg-white rounded-3xl shadow-sm p-8 md:p-10 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <h2 className="text-3xl font-serif">Description</h2>
-            <input
-              type="search"
-              value={descriptionQuery}
-              onChange={(e) => setDescriptionQuery(e.target.value)}
-              placeholder="Search in description..."
-              className="w-full md:w-72 bg-cream/50 border border-primary/10 rounded-xl px-4 py-3 text-primary"
-            />
-          </div>
-
-          {!hasDescriptionQuery && (
-            <div className="relative">
-              <div
-                className={`prose prose-sm max-w-none text-primary/80 ${isLongDescription && !isDescriptionExpanded ? 'max-h-72 overflow-hidden' : ''}`}
-                dangerouslySetInnerHTML={{ __html: sanitizedDescription || '<p>No description available.</p>' }}
-              />
-              {isLongDescription && !isDescriptionExpanded && (
-                <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-              )}
+        {/* Similar Products Carousel */}
+        <section className="mt-32 pt-16 border-t border-primary/5">
+          <div className="flex items-end justify-between mb-12">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-secondary mb-3">Keep Exploring</p>
+              <h2 className="text-4xl lg:text-5xl font-serif text-primary">Discover More</h2>
             </div>
-          )}
-
-          {hasDescriptionQuery && (
-            <div className="space-y-4">
-              {filteredDescriptionBlocks.length === 0 ? (
-                <p className="text-sm text-primary/60">No description sections match your search.</p>
-              ) : (
-                filteredDescriptionBlocks.map((block, index) => (
-                  <div
-                    key={`${index}-${block.text.slice(0, 16)}`}
-                    className="prose prose-sm max-w-none text-primary/80"
-                    dangerouslySetInnerHTML={{ __html: block.html }}
-                  />
-                ))
-              )}
-            </div>
-          )}
-
-          {isLongDescription && !hasDescriptionQuery && (
-            <button
-              type="button"
-              onClick={() => setIsDescriptionExpanded((value) => !value)}
-              className="text-sm font-bold uppercase tracking-widest text-secondary hover:underline"
-            >
-              {isDescriptionExpanded ? 'Read less' : 'Read more'}
-            </button>
-          )}
-        </section>
-
-        <section className="mt-16">
-          <div className="flex items-end justify-between mb-8">
-            <h2 className="text-3xl font-serif">Similar Products</h2>
           </div>
 
           {similarLoading ? (
-            <div className="bg-white rounded-3xl p-10 text-center text-primary/60">Loading similar products...</div>
+            <div className="h-64 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-primary/40 animate-pulse">Loading Curated Selection...</div>
           ) : similarProducts.length === 0 ? (
-            <div className="bg-white rounded-3xl p-10 text-center text-primary/60">No similar products found.</div>
+            <div className="h-40 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest text-primary/40">No similar pieces found.</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {similarProducts.slice(0, 8).map((similarProduct) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 xl:gap-10">
+              {similarProducts.slice(0, 4).map((similarProduct) => (
                 <ProductCard
                   key={similarProduct.id}
                   product={similarProduct}
@@ -778,55 +775,60 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
         </section>
       </div>
 
-      <div className="mt-16">
+      <div className="mt-32">
         <Newsletter />
       </div>
 
+      {/* Lightbox / Modal */}
       {isLightboxOpen && (
-        <div className="fixed inset-0 z-50 bg-black/85 p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Product image gallery">
-          <div className="h-full max-w-5xl mx-auto flex flex-col">
-            <div className="flex justify-end">
-              <button
-                ref={lightboxCloseRef}
-                type="button"
-                onClick={() => setIsLightboxOpen(false)}
-                className="text-white/90 hover:text-white p-2"
-                aria-label="Close gallery"
-              >
-                <X size={28} />
-              </button>
-            </div>
-            <div className="flex-1 flex items-center justify-center gap-4">
+        <div className="fixed inset-0 z-[100] bg-[#FAF9F6]/95 backdrop-blur-md p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Product image gallery">
+          <div className="h-full w-full max-w-6xl mx-auto flex flex-col relative">
+            <button
+              ref={lightboxCloseRef}
+              type="button"
+              onClick={() => setIsLightboxOpen(false)}
+              className="absolute top-0 right-0 z-10 w-12 h-12 rounded-full bg-white shadow-xl shadow-primary/5 flex items-center justify-center text-primary hover:scale-110 transition-transform duration-300"
+              aria-label="Close gallery"
+            >
+              <X size={20} strokeWidth={2} />
+            </button>
+            <div className="flex-1 flex items-center justify-center w-full h-full relative">
               {galleryImages.length > 1 && (
                 <button
-                  type="button"
                   onClick={() => setLightboxIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length)}
-                  className="text-white text-4xl px-3 py-2 hover:bg-white/10 rounded-lg"
-                  aria-label="Previous image"
+                  className="absolute left-0 md:-left-8 w-12 h-12 rounded-full bg-white shadow-xl shadow-primary/5 flex items-center justify-center text-primary hover:scale-110 transition-all z-10"
                 >
-                  ‹
+                  <ChevronRight size={20} className="rotate-180" />
                 </button>
               )}
+
               <img
                 src={galleryImages[lightboxIndex]?.src}
-                alt={galleryImages[lightboxIndex]?.alt || product.name}
-                className="max-h-[78vh] w-auto object-contain"
-                referrerPolicy="no-referrer"
+                alt={galleryImages[lightboxIndex]?.alt || 'Gallery image'}
+                className="max-w-full max-h-[85vh] object-contain drop-shadow-2xl rounded-sm"
               />
+
               {galleryImages.length > 1 && (
                 <button
-                  type="button"
                   onClick={() => setLightboxIndex((prev) => (prev + 1) % galleryImages.length)}
-                  className="text-white text-4xl px-3 py-2 hover:bg-white/10 rounded-lg"
-                  aria-label="Next image"
+                  className="absolute right-0 md:-right-8 w-12 h-12 rounded-full bg-white shadow-xl shadow-primary/5 flex items-center justify-center text-primary hover:scale-110 transition-all z-10"
                 >
-                  ›
+                  <ChevronRight size={20} />
                 </button>
               )}
             </div>
-            <p className="text-center text-sm text-white/70 mt-4">
-              {lightboxIndex + 1} / {galleryImages.length}
-            </p>
+            {galleryImages.length > 1 && (
+              <div className="mt-8 flex justify-center gap-3">
+                {galleryImages.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setLightboxIndex(idx)}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${idx === lightboxIndex ? 'bg-primary w-8' : 'bg-primary/20 w-3 hover:bg-primary/40'}`}
+                    aria-label={`Go to slide ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
