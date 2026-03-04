@@ -432,7 +432,7 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
         <div className="flex flex-col lg:flex-row gap-12 xl:gap-24 relative items-start">
 
           {/* Left Column: Sticky Image Gallery */}
-          <div className="w-full lg:w-[55%] lg:sticky lg:top-32 space-y-6">
+          <div className="w-full lg:w-[55%] lg:sticky lg:top-32 space-y-6 flex flex-col items-center lg:items-end">
             <button
               ref={mainImageButtonRef}
               type="button"
@@ -440,7 +440,7 @@ export const ProductDetail = ({ product: initialProduct, onBack, onAddToCart, on
                 setLightboxIndex(activeImageIndex);
                 setIsLightboxOpen(true);
               }}
-              className="w-full aspect-[4/5] overflow-hidden rounded-[2.5rem] bg-stone-100 shadow-2xl shadow-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/20 relative group"
+              className="w-full max-w-[440px] aspect-[4/5] overflow-hidden rounded-[2.5rem] bg-stone-100 shadow-2xl shadow-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/20 relative group"
               aria-label="Open image gallery"
             >
               <img
