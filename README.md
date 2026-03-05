@@ -21,6 +21,16 @@ View your app in AI Studio: https://ai.studio/apps/860ef45c-582a-4940-8511-f287e
 4. Run the app:
    `npm run dev`
 
+## Hostinger 404 On Refresh (SPA Fix)
+
+If route refreshes like `/catalog` or `/product/123` return 404 on Hostinger:
+
+1. Build the app: `npm run build`
+2. Upload the **contents** of `dist/` to `public_html/` (not the `dist` folder itself)
+3. Ensure `.htaccess` is present in `public_html/` (this repo now provides it via `public/.htaccess`)
+
+The `.htaccess` rule rewrites unknown frontend routes to `index.html`, while keeping `/api/*` paths untouched.
+
 ## WooCommerce Headless Notes
 
 - Customer account creation uses `POST /api/store/auth/register` and creates WooCommerce customers directly in WordPress.
