@@ -22,12 +22,6 @@ export const ThankYou = ({ setActivePage }: ThankYouProps) => (
         >
           Continue Shopping
         </button>
-        <button 
-          onClick={() => setActivePage('account')}
-          className="bg-white text-primary border border-primary/10 px-10 py-4 rounded-full font-bold uppercase tracking-widest hover:bg-cream transition-all"
-        >
-          View My Orders
-        </button>
       </div>
     </div>
   </div>

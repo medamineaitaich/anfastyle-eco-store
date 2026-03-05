@@ -8,10 +8,6 @@ import { Checkout } from './pages/Checkout';
 import { ThankYou } from './pages/ThankYou';
 import { About } from './pages/About';
 import { Contact } from './pages/Contact';
-import { Register } from './pages/Register';
-import { ResetPassword } from './pages/ResetPassword';
-import { UserProfile } from './pages/UserProfile';
-import { WishlistPage } from './pages/Wishlist';
 import { SearchResults } from './pages/SearchResults';
 import { FAQs, PrivacyPolicy, TermsOfService, Disclaimer } from './pages/Legal';
 import { SearchOverlay } from './components/common/SearchOverlay';
@@ -20,11 +16,10 @@ import { Popup } from './components/common/Popup';
 import { useCart } from './hooks/useCart';
 import { useWishlist } from './hooks/useWishlist';
 import { useAuth } from './hooks/useAuth';
-import { Product, User } from './types';
+import { Product } from './types';
 import { PRODUCTS as MOCK_PRODUCTS } from './data/products';
 import { clearSession, getSession, setSession } from './services/authStorage';
 import { fetchCustomerProfile } from './services/customer';
-import { ApiError } from './services/http';
 
 function getPathForPage(page: string, selectedProduct?: Product | null): string {
   switch (page) {
@@ -43,7 +38,7 @@ function getPathForPage(page: string, selectedProduct?: Product | null): string 
     case 'contact':
       return '/contact';
     case 'account':
-      return '/account';
+      return '/';
     case 'search-results':
       return '/search-results';
     case 'faqs':
@@ -67,8 +62,8 @@ function getActivePageFromPath(pathname: string): string {
   if (pathname.startsWith('/thank-you')) return 'thank-you';
   if (pathname.startsWith('/about')) return 'about';
   if (pathname.startsWith('/contact')) return 'contact';
-  if (pathname.startsWith('/account')) return 'account';
-  if (pathname.startsWith('/reset-password')) return 'account';
+  if (pathname.startsWith('/account')) return 'home';
+  if (pathname.startsWith('/reset-password')) return 'home';
   if (pathname.startsWith('/search-results')) return 'search-results';
   if (pathname.startsWith('/faqs')) return 'faqs';
   if (pathname.startsWith('/privacy')) return 'privacy';
@@ -90,12 +85,10 @@ export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [authToken, setAuthToken] = useState('');
-  const [isAuthHydrating, setIsAuthHydrating] = useState(true);
-  const [authNotice, setAuthNotice] = useState('');
 
   const { cart, isCartOpen, setIsCartOpen, addToCart, updateQuantity, removeFromCart, clearCart, cartCount } = useCart();
   const { user, setUser, addOrder } = useAuth();
-  const { wishlist, isWishlisted, removeFromWishlist, toggleWishlist } = useWishlist(products, authToken);
+  const { wishlist, isWishlisted, toggleWishlist } = useWishlist(products, authToken);
 
   useEffect(() => {
     setActivePage(getActivePageFromPath(location.pathname));
@@ -108,7 +101,6 @@ export default function App() {
       if (!session) {
         setAuthToken('');
         setUser(null);
-        setIsAuthHydrating(false);
         return;
       }
 
@@ -125,14 +117,8 @@ export default function App() {
         const nextUser = { ...cachedUser, ...freshProfile, token: session.token };
         setUser(nextUser);
         setSession({ token: session.token, user: nextUser });
-        setAuthNotice('');
-      } catch (error) {
+      } catch {
         if (!mounted) return;
-        if (error instanceof ApiError && error.status === 401) {
-          setAuthNotice('Signed in, but profile sync failed. Please refresh account details.');
-        }
-      } finally {
-        if (mounted) setIsAuthHydrating(false);
       }
     };
 
@@ -147,11 +133,11 @@ export default function App() {
 
     const handleAuthExpired = (event: Event) => {
       const detail = (event as CustomEvent<{ message?: string }>).detail;
-      setAuthNotice(detail?.message || 'Your session expired. Please sign in again.');
+      console.warn(detail?.message || 'Your session expired. Please sign in again.');
       setAuthToken('');
       setUser(null);
       clearSession();
-      navigate('/account');
+      navigate('/');
     };
 
     window.addEventListener('auth:expired', handleAuthExpired);
@@ -197,46 +183,6 @@ export default function App() {
     setSelectedProduct(product);
     setActivePage('product-detail');
     navigate(`/product/${product.id}`);
-  };
-
-  const handleSetAuthUser = (nextUser: User | null) => {
-    setUser(nextUser);
-
-    if (!nextUser) {
-      setAuthToken('');
-      setAuthNotice('');
-      clearSession();
-      return;
-    }
-
-    const token = String(nextUser.token || authToken || '');
-    if (!token) {
-      setAuthToken('');
-      setAuthNotice('Login failed: missing session token. Please sign in again.');
-      clearSession();
-      setUser(null);
-      return;
-    }
-
-    const userWithToken = { ...nextUser, token };
-    setAuthToken(token);
-    setAuthNotice('');
-    setSession({ token, user: userWithToken });
-
-    if (token) {
-      void fetchCustomerProfile({ logoutOnUnauthorized: false })
-        .then((freshProfile) => {
-          const merged = { ...userWithToken, ...freshProfile, token };
-          setUser(merged);
-          setSession({ token, user: merged });
-          setAuthNotice('');
-        })
-        .catch((error) => {
-          if (error instanceof ApiError && error.status === 401) {
-            setAuthNotice('Signed in, but profile sync failed. Please refresh account details.');
-          }
-        });
-    }
   };
 
   useEffect(() => {
@@ -315,64 +261,9 @@ export default function App() {
         <Route path="/thank-you" element={<ThankYou setActivePage={handleSetActivePage} />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
-        <Route
-          path="/account"
-          element={
-            isAuthHydrating && authToken ? (
-              <div className="py-20 bg-cream min-h-screen flex items-center justify-center">
-                <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-              </div>
-            ) : user ? (
-              <UserProfile
-                user={user}
-                setUser={handleSetAuthUser}
-                wishlist={wishlist}
-                removeFromWishlist={(productId) => {
-                  removeFromWishlist(productId).catch(() => undefined);
-                }}
-                setActivePage={handleSetActivePage}
-              />
-            ) : (
-              <Register
-                externalMessage={authNotice}
-                onLogin={(u: User) => {
-                  setAuthNotice('');
-                  handleSetAuthUser(u);
-                  handleSetActivePage('account');
-                }}
-              />
-            )
-          }
-        />
-        <Route
-          path="/account/wishlist"
-          element={
-            isAuthHydrating && authToken ? (
-              <div className="py-20 bg-cream min-h-screen flex items-center justify-center">
-                <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-              </div>
-            ) : user ? (
-              <WishlistPage
-                wishlist={wishlist}
-                onSelectProduct={handleSelectProduct}
-                onToggleWishlist={(product) => {
-                  toggleWishlist(product).catch(() => undefined);
-                }}
-                isWishlisted={isWishlisted}
-              />
-            ) : (
-              <Register
-                externalMessage={authNotice}
-                onLogin={(u: User) => {
-                  setAuthNotice('');
-                  handleSetAuthUser(u);
-                  navigate('/account/wishlist');
-                }}
-              />
-            )
-          }
-        />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/account" element={<Navigate to="/" replace />} />
+        <Route path="/account/wishlist" element={<Navigate to="/" replace />} />
+        <Route path="/reset-password" element={<Navigate to="/" replace />} />
         <Route
           path="/search-results"
           element={
@@ -400,7 +291,6 @@ export default function App() {
       activePage={activePage}
       setActivePage={handleSetActivePage}
       onSearchOpen={() => setIsSearchOpen(true)}
-      onAccountOpen={() => handleSetActivePage('account')}
       onCartOpen={() => setIsCartOpen(true)}
       cartCount={cartCount}
     >

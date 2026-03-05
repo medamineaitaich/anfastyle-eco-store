@@ -112,10 +112,10 @@ export const Checkout = ({ cart, onComplete, user }: CheckoutProps) => {
             <p className="text-sm text-primary/60">Total: <span className="font-bold text-primary">${successOrder.total}</span></p>
             <div className="pt-2">
               <button
-                onClick={() => navigate('/account')}
+                onClick={() => navigate('/catalog')}
                 className="inline-flex items-center justify-center bg-primary text-cream px-8 py-3 rounded-full font-bold uppercase tracking-widest hover:bg-accent transition-all"
               >
-                View My Orders
+                Continue Shopping
               </button>
             </div>
           </div>

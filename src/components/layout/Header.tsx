@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
-import { Search, User, ShoppingBag, Menu, X } from 'lucide-react';
+import { Search, ShoppingBag, Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface HeaderProps {
   onSearchOpen: () => void;
   onCartOpen: () => void;
-  onAccountOpen: () => void;
   activePage: string;
   setActivePage: (page: string) => void;
   cartCount: number;
 }
 
-export const Header = ({ onSearchOpen, onCartOpen, onAccountOpen, activePage, setActivePage, cartCount }: HeaderProps) => {
+export const Header = ({ onSearchOpen, onCartOpen, activePage, setActivePage, cartCount }: HeaderProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navLinks = [
@@ -56,9 +55,6 @@ export const Header = ({ onSearchOpen, onCartOpen, onAccountOpen, activePage, se
           <div className="flex items-center space-x-4">
             <button onClick={onSearchOpen} className="text-primary hover:text-secondary transition-colors p-2">
               <Search size={20} />
-            </button>
-            <button onClick={onAccountOpen} className="text-primary hover:text-secondary transition-colors p-2">
-              <User size={20} />
             </button>
             <button onClick={onCartOpen} className="text-primary hover:text-secondary transition-colors p-2 relative">
               <ShoppingBag size={20} />

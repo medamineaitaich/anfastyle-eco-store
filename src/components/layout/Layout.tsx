@@ -8,7 +8,6 @@ interface LayoutProps {
   activePage: string;
   setActivePage: (page: string) => void;
   onSearchOpen: () => void;
-  onAccountOpen: () => void;
   onCartOpen: () => void;
   cartCount: number;
 }
@@ -18,7 +17,6 @@ export const Layout = ({
   activePage,
   setActivePage,
   onSearchOpen,
-  onAccountOpen,
   onCartOpen,
   cartCount
 }: LayoutProps) => {
@@ -29,7 +27,6 @@ export const Layout = ({
         activePage={activePage}
         setActivePage={setActivePage}
         onSearchOpen={onSearchOpen}
-        onAccountOpen={onAccountOpen}
         onCartOpen={onCartOpen}
         cartCount={cartCount}
       />
